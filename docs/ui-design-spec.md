@@ -121,6 +121,10 @@
 - Right Inspector: 기본 320px, 최소 280px, 최대 420px
 - Center Canvas: 잔여 폭 전체
 
+정적 UI 프리뷰(`preview/*.html`) 기준:
+- Right Inspector 영역을 사용하지 않는다.
+- 2열 구조(Left Explorer + Center Canvas)에서 패널 내부 컨트롤을 강화한다.
+
 ## 4.3 패널 여백
 
 - 앱 전체 패딩: 8px
@@ -227,6 +231,25 @@
 Pinned 컬럼:
 - 좌측 고정 영역 배경 `--bg-panel`
 - 경계 그림자 `inset -1px 0 0 var(--divider)`
+
+## 5.6.1 필드(컬럼) 선택 UI (Panel Inline)
+
+구성:
+- 제목: `Fields`
+- 선택 개수 배지: `N selected`
+- 토글 버튼: `Choose Columns` / `Close Columns`
+- 옵션: 체크박스 + 컬럼명 칩
+
+배치:
+- 필터/정렬/페이징 바 바로 아래
+- 테이블 컨텐츠 바로 위
+- 패널 내부 구분선(`--divider`)으로 분리
+
+상태:
+- 기본: 옵션 영역 닫힘
+- 열림: 옵션 칩 wrap 배치
+- 체크 해제: 해당 컬럼 즉시 숨김
+- 최소 1개 컬럼은 항상 유지
 
 ## 5.7 Inspector
 
@@ -351,6 +374,7 @@ JSON 뷰:
 5. `auth_expired`, `network_error`, `filter_invalid` 시각 표현이 구분된다.
 6. 모달 포커스 트랩, Esc 닫기가 동작한다.
 7. 1280px, 1440px, 1728px에서 레이아웃이 무너지지 않는다.
+8. 패널 내 `Fields` 선택 UI에서 컬럼 표시/숨김이 즉시 반영된다.
 
 ---
 

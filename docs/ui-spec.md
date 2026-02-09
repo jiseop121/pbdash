@@ -61,6 +61,10 @@
 3. Center Workspace Canvas
 4. Right Inspector
 
+정적 UI 프리뷰(`preview/*.html`) 기준:
+- Right Inspector는 제거한다.
+- 컬럼 구성 기능은 각 패널 내부 `Fields` 영역에서 제공한다.
+
 ### 3.1 Top Bar
 
 필수 버튼:
@@ -314,6 +318,21 @@
 - `Prev`는 1페이지에서 비활성
 - `Next`는 마지막 페이지에서 비활성
 - 페이지 이동 시 목록 재조회
+
+### 6.4.6 필드(컬럼) 지정
+
+프리뷰 기준 위치:
+- 각 패널의 필터/정렬/페이징 영역 아래, 테이블 위
+
+동작 규칙:
+- `Choose Columns` 버튼으로 컬럼 선택 영역을 열고 닫는다.
+- 컬럼 체크박스 on/off 시 해당 테이블 컬럼을 즉시 표시/숨김 처리한다.
+- 최소 1개 컬럼은 항상 표시 상태를 유지한다.
+- 선택 수는 `N selected` 형태로 즉시 갱신한다.
+
+의미 매핑:
+- 이 기능은 실제 앱의 `visibleColumns` 제어와 동일한 의미를 가진다.
+- MVP 본 구현에서 Inspector의 Columns 탭과 연결되는 동작을 프리뷰에서는 패널 내부로 대체한다.
 
 ## 6.5 컬럼 구성(Inspector > Columns)
 
