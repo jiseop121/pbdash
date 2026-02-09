@@ -1,51 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap');
+
 :root {
-  /* Color */
-  --bg-app: #f4f6f8;
-  --bg-panel: #ffffff;
-  --bg-subtle: #f8fafc;
-  --bg-hover: #eef2f7;
-  --bg-selected: #e8f0fe;
+  --surface-base: #e9ece8;
+  --surface-app: #f7f8f5;
+  --surface-panel: #fcfcfa;
+  --surface-muted: #eef1eb;
+  --surface-hover: #e3e9e1;
+  --surface-selected: #d8e8df;
 
-  --border-default: #d8dee8;
-  --border-strong: #b8c2d1;
-  --divider: #e5eaf1;
+  --text-primary: #1e2a24;
+  --text-secondary: #42534b;
+  --text-muted: #5f7168;
+  --text-inverse: #f8f8f4;
 
-  --text-primary: #1f2937;
-  --text-secondary: #4b5563;
-  --text-muted: #6b7280;
-  --text-inverse: #ffffff;
+  --border-base: #c9d1c8;
+  --border-strong: #9aa79d;
+  --divider: #d7dfd5;
 
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
-  --accent-soft: #dbeafe;
+  --accent: #2f5d50;
+  --accent-strong: #1f4339;
+  --accent-soft: #d5e4dd;
+  --success: #2f7a55;
+  --success-soft: #dcefe5;
+  --warning: #a85a32;
+  --warning-soft: #f2dfd3;
+  --danger: #9f2e2a;
+  --danger-soft: #f2d9d8;
+  --focus-ring: #79a99a;
 
-  --success: #15803d;
-  --warning: #b45309;
-  --danger: #b91c1c;
-  --danger-soft: #fee2e2;
-  --warning-soft: #fef3c7;
-  --success-soft: #dcfce7;
+  --shadow-soft: 0 10px 22px rgba(20, 29, 25, 0.08);
+  --shadow-strong: 0 18px 36px rgba(20, 29, 25, 0.14);
 
-  --focus-ring: #60a5fa;
+  --font-head: 'Archivo Narrow', 'Noto Sans KR', sans-serif;
+  --font-body: 'IBM Plex Sans KR', 'Noto Sans KR', sans-serif;
+  --font-mono: 'IBM Plex Mono', 'D2Coding', monospace;
 
-  /* Typography */
-  --font-family-base: "Pretendard Variable", "Noto Sans KR", sans-serif;
-  --font-family-mono: "JetBrains Mono", "SFMono-Regular", monospace;
-
-  --font-size-12: 12px;
-  --line-height-12: 18px;
-  --font-size-13: 13px;
-  --line-height-13: 20px;
-  --font-size-14: 14px;
-  --line-height-14: 22px;
-  --font-size-16: 16px;
-  --line-height-16: 24px;
-
-  --font-weight-regular: 400;
-  --font-weight-medium: 500;
-  --font-weight-semibold: 600;
-
-  /* Spacing (4pt grid) */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -53,51 +42,14 @@
   --space-5: 20px;
   --space-6: 24px;
 
-  /* Radius and border */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --border-1: 1px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
 
-  /* Layout */
   --topbar-height: 48px;
-  --app-min-width: 1280px;
-  --app-min-height: 800px;
 
-  --explorer-width-default: 260px;
-  --explorer-width-min: 220px;
-  --explorer-width-max: 360px;
-  --inspector-width-default: 320px;
-  --inspector-width-min: 280px;
-  --inspector-width-max: 420px;
-
-  --app-padding: 8px;
-  --panel-padding: 8px;
-  --section-gap: 8px;
-
-  /* Component sizes */
-  --control-height-default: 32px;
-  --control-height-compact: 28px;
-  --tab-height: 34px;
-  --table-header-height: 34px;
-  --table-row-height: 32px;
-  --badge-height: 20px;
-  --toast-height: 44px;
-
-  /* Motion */
-  --motion-fast: 120ms;
-  --motion-normal: 180ms;
-  --motion-slow: 240ms;
-  --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
-}
-
-[data-density="compact"] {
-  --control-height-default: 28px;
-  --tab-height: 32px;
-  --table-header-height: 32px;
-  --table-row-height: 30px;
-}
-
-[data-width="narrow"] {
-  --inspector-width-default: 280px;
+  --motion-fast: 140ms;
+  --motion-mid: 220ms;
+  --motion-slow: 320ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
 }
