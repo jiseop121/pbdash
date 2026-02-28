@@ -125,6 +125,9 @@ export interface RuntimeStore {
 - 영속 저장(`PersistedStore`): `instances`, `tableViewPresets`, `workspacePresets`, `favorites`
 - 메모리 전용(`RuntimeStore`): `authSession`, 인스턴스 상태(`status`), 일시 오류 메시지
 - 금지 규칙: `token`, `adminUser`는 디스크 저장 금지
+- 영속 키: `pbmulti.instances.v1`, `pbmulti.tableViewPresets.v1`, `pbmulti.workspacePresets.v1`, `pbmulti.favorites.v1`
+- `PanelTableState.page`는 1-base 인덱스를 사용
+- `sortSpec` 직렬화: `asc=field`, `desc=-field`, `none=""`
 
 ## 3) 상태 전이 다이어그램
 
@@ -179,3 +182,4 @@ stateDiagram-v2
 5. 동기화 전파는 `syncGroupId` 기준으로 수행하고, 실패 대상은 이전 상태를 유지한다.
 6. 동기화 부분 실패는 성공한 패널을 롤백하지 않는다.
 7. `appliedAt`이 최신인 이벤트를 최종 상태로 인정한다.
+8. 자동 재시도 대상은 읽기 요청 1건으로 제한한다.

@@ -4,6 +4,10 @@
 목표는 "읽히는 성공 경로(Primary Flow)"를 먼저 고정하고, 경계(I/O)와 Atom을 최소 단위로 정리하는 것이다.
 문서 간 우선순위 충돌은 `docs/docs-index.md`를 따른다.
 
+현재 트랙 적용:
+- Track 1 진행 중에는 CLI 경로(`-c`, script, repl)만 구현하고, UI 관련 Atom(`runUI`, `startHTTPServer`, `openBrowser`)은 보류한다.
+- Track 2 시작 시 UI 관련 Atom을 활성화한다.
+
 ---
 
 ## 1) Intent

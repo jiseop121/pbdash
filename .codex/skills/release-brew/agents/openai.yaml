@@ -1,0 +1,4 @@
+interface:
+  display_name: "Release Brew"
+  short_description: "Build and publish Homebrew release artifacts safely."
+  default_prompt: "Use $release-brew to build binaries, update the tap formula, and verify brew install."
