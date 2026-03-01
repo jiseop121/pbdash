@@ -10,7 +10,7 @@ import (
 	"multi-pocketbase-ui/internal/cli"
 )
 
-const Version = "0.2.0"
+const Version = "0.2.1"
 
 func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	cfg, err := ParseRunConfig(args, stdin, stdout, stderr)

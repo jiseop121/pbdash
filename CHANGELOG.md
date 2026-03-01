@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1] - 2026-03-02
+
+### Added
+- Added automated GitHub Release notes workflow on `v*` tag push.
+- Added `make release-tag VERSION=x.y.z` command for release tagging.
+
 ## [0.2.0] - 2026-03-02
 
 ### Added
