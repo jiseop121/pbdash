@@ -448,18 +448,42 @@ func positiveInt(s string) (int, error) {
 }
 
 func (d *Dispatcher) printHelp() {
-	help := strings.TrimSpace(`pbmulti commands:
-  version
-  help
+	help := strings.TrimSpace(`pbmulti command reference
+
+Run modes:
+  pbmulti                         Start REPL mode.
+  pbmulti -c "<command>"          Run one command and exit.
+  pbmulti <script-file>           Execute commands from a script file.
+
+Core commands:
+  version                         Print CLI version.
+  help                            Show available commands.
+
+DB commands:
   db add --alias <dbAlias> --url <baseUrl>
-  db list
-  db remove --alias <dbAlias>
+                                  Save a PocketBase base URL as a db alias.
+  db list                         List saved db aliases.
+  db remove --alias <dbAlias>     Remove a saved db alias.
+
+Superuser commands:
   superuser add --db <dbAlias> --alias <superuserAlias> --email <email> --password <password>
-  superuser list --db <dbAlias>
+                                  Save superuser credentials for a db alias.
+  superuser list --db <dbAlias>   List superuser aliases for a db alias.
   superuser remove --db <dbAlias> --alias <superuserAlias>
+                                  Remove a saved superuser alias.
+
+API commands (read-only GET):
   api collections --db <dbAlias> --superuser <superuserAlias> [--format table|csv|markdown] [--out <path>]
+                                  List collections from PocketBase.
   api collection --db <dbAlias> --superuser <superuserAlias> --name <collectionName> [--format table|csv|markdown] [--out <path>]
+                                  Get one collection by name.
   api records --db <dbAlias> --superuser <superuserAlias> --collection <collectionName> [--page <n>] [--per-page <n>] [--sort <expr>] [--filter <expr>] [--format table|csv|markdown] [--out <path>]
-  api record --db <dbAlias> --superuser <superuserAlias> --collection <collectionName> --id <recordId> [--format table|csv|markdown] [--out <path>]`)
+                                  List records with paging, sort, and filter options.
+  api record --db <dbAlias> --superuser <superuserAlias> --collection <collectionName> --id <recordId> [--format table|csv|markdown] [--out <path>]
+                                  Get one record by id.
+
+Output:
+  Default format is table.
+  csv/markdown requires --out <path>.`)
 	_, _ = fmt.Fprintln(d.stdout, help)
 }

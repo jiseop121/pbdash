@@ -20,6 +20,7 @@
 | `docs/cli-core-implementation-spec.md` | Track 1 구현 상세 | Atom 계약, 실행 순서, 테스트 계약, 파일 배치 | 제품 정책 재정의 |
 | `docs/ui-mode-dev-spec.md` | Track 2 개발 기준 | `-ui` 실행, UI 서버/라우팅/헬스체크 | CLI 핵심 동작 재정의 |
 | `docs/deployment-cli-brew-spec.md` | 통합 배포 로드맵 | 트랙별 릴리스/통합 게이트 | 트랙 내부 상세 규칙 |
+| `docs/development-guide.md` | 개발/검증 실행 가이드 | 테스트, E2E, 로컬 디버깅 절차 | 제품 정책/타입 원본 정의 |
 | `docs/structure-first-project-design.md` | 코드 구조 원칙 | 오케스트레이션, boundary, 테스트 구조 | 제품 요구사항 결정 |
 
 ## 3) 우선순위 규칙
@@ -49,16 +50,21 @@
 
 ## 6) 권장 읽기 순서
 
-기획/PM:
+사용자:
 1. `README.md`
 2. `docs/docs-index.md`
+
+기획/PM:
+1. `docs/docs-index.md`
+2. `docs/ui-spec.md`
 3. `docs/cli-core-dev-spec.md`
 4. `docs/ui-mode-dev-spec.md`
 
 개발:
-1. `docs/cli-core-dev-spec.md`
-2. `docs/cli-core-implementation-spec.md`
-3. `docs/structure-first-project-design.md`
-4. `docs/ui-mode-dev-spec.md` (Track 2 시작 시점부터)
-5. `docs/spec-contracts.md`
-6. `docs/ui-spec.md`
+1. `docs/development-guide.md`
+2. `docs/cli-core-dev-spec.md`
+3. `docs/cli-core-implementation-spec.md`
+4. `docs/structure-first-project-design.md`
+5. `docs/ui-mode-dev-spec.md` (Track 2 시작 시점부터)
+6. `docs/spec-contracts.md`
+7. `docs/ui-spec.md`

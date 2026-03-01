@@ -111,3 +111,37 @@ func TestAPIAuthFailureMapsToExternalExitCode(t *testing.T) {
 		t.Fatalf("unexpected error format: %s", apperr.Format(err))
 	}
 }
+
+func TestHelpIncludesCommandDescriptions(t *testing.T) {
+	buf := bytes.NewBuffer(nil)
+	d := NewDispatcher(DispatcherConfig{Stdout: buf, Version: "test", DataDir: t.TempDir()})
+
+	if err := d.Execute(context.Background(), "help"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	out := buf.String()
+	required := []string{
+		"pbmulti command reference",
+		"Run modes:",
+		"Core commands:",
+		"DB commands:",
+		"Superuser commands:",
+		"API commands (read-only GET):",
+		"version                         Print CLI version.",
+		"help                            Show available commands.",
+		"db add --alias <dbAlias> --url <baseUrl>",
+		"Save a PocketBase base URL as a db alias.",
+		"superuser add --db <dbAlias> --alias <superuserAlias> --email <email> --password <password>",
+		"Save superuser credentials for a db alias.",
+		"api record --db <dbAlias> --superuser <superuserAlias> --collection <collectionName> --id <recordId>",
+		"Get one record by id.",
+		"csv/markdown requires --out <path>.",
+	}
+
+	for _, token := range required {
+		if !strings.Contains(out, token) {
+			t.Fatalf("help output missing token %q:\n%s", token, out)
+		}
+	}
+}
