@@ -7,14 +7,8 @@
 ### Homebrew (공식)
 
 ```bash
-brew tap jiseop121/multi-pocketbase-ui
-brew install jiseop121/multi-pocketbase-ui/pocketbase-multiview
-```
-
-또는 formula URL 직접 설치:
-
-```bash
-brew install --formula https://raw.githubusercontent.com/jiseop121/multi-pocketbase-ui/main/Formula/pocketbase-multiview.rb
+brew tap jiseop121/pocketbase-multiview https://github.com/jiseop121/multi-pocketbase-ui
+brew install jiseop121/pocketbase-multiview/pocketbase-multiview
 ```
 
 ### 소스에서 설치 (보조)

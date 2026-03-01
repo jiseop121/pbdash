@@ -104,8 +104,10 @@ ARTIFACT_ARM64="${BINARY_NAME}-v${VERSION}-darwin-arm64.tar.gz"
 ARTIFACT_AMD64="${BINARY_NAME}-v${VERSION}-darwin-amd64.tar.gz"
 
 echo "==> build binaries"
-GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o "$WORKDIR/arm64/${BINARY_NAME}" ./cmd/pbmulti
-GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o "$WORKDIR/amd64/${BINARY_NAME}" ./cmd/pbmulti
+BUILD_FLAGS=(-trimpath -ldflags "-s -w -buildid=")
+GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build "${BUILD_FLAGS[@]}" -o "$WORKDIR/arm64/${BINARY_NAME}" ./cmd/pbmulti
+GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build "${BUILD_FLAGS[@]}" -o "$WORKDIR/amd64/${BINARY_NAME}" ./cmd/pbmulti
+touch -t 197001010000 "$WORKDIR/arm64/${BINARY_NAME}" "$WORKDIR/amd64/${BINARY_NAME}"
 
 (
   cd "$WORKDIR/arm64"
@@ -169,10 +171,15 @@ if [[ "$DRY_RUN" -eq 0 ]]; then
   fi
 
   echo "==> brew smoke"
-  brew untap "$GITHUB_REPO" >/dev/null 2>&1 || true
-  brew tap "$GITHUB_REPO"
+  TAP_ALIAS="${GITHUB_REPO%%/*}/pocketbase-multiview"
+  TAP_REMOTE="$(git remote get-url origin 2>/dev/null || true)"
+  if [[ -z "$TAP_REMOTE" ]]; then
+    TAP_REMOTE="https://github.com/${GITHUB_REPO}.git"
+  fi
+  brew untap "$TAP_ALIAS" >/dev/null 2>&1 || true
+  brew tap "$TAP_ALIAS" "$TAP_REMOTE"
   brew uninstall --force "$FORMULA_NAME" >/dev/null 2>&1 || true
-  brew install "$GITHUB_REPO/$FORMULA_NAME"
+  brew install "$TAP_ALIAS/$FORMULA_NAME"
 
   INSTALLED_VERSION="$(${BINARY_NAME} -c "version" | tr -d '\n')"
   if [[ "$INSTALLED_VERSION" != "$VERSION" ]]; then
