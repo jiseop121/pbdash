@@ -1,18 +1,18 @@
 package pocketbase
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"net/url"
 	"path"
 	"strings"
 	"time"
+
+	pbclient "github.com/mrchypark/pocketbase-client"
 )
 
 type Client struct {
@@ -24,26 +24,61 @@ func NewClient() *Client {
 }
 
 type APIError struct {
-	Status int
-	Body   string
+	Status  int
+	Code    string
+	Message string
+	Body    string
+	Cause   error
 }
 
 func (e *APIError) Error() string {
 	if e == nil {
 		return ""
 	}
+	if strings.TrimSpace(e.Message) != "" {
+		if strings.TrimSpace(e.Code) != "" {
+			return fmt.Sprintf("pocketbase api error (status=%d code=%s): %s", e.Status, e.Code, e.Message)
+		}
+		return fmt.Sprintf("pocketbase api error (status=%d): %s", e.Status, e.Message)
+	}
 	return fmt.Sprintf("pocketbase api error (status=%d)", e.Status)
 }
 
+func (e *APIError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	if e.Cause != nil {
+		return e.Cause
+	}
+	return nil
+}
+
 type AuthError struct {
+	Status  int
+	Code    string
 	Message string
+	Cause   error
 }
 
 func (e *AuthError) Error() string {
-	if e == nil || e.Message == "" {
+	if e == nil {
+		return ""
+	}
+	if strings.TrimSpace(e.Message) == "" {
 		return "authentication failed"
 	}
 	return e.Message
+}
+
+func (e *AuthError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	if e.Cause != nil {
+		return e.Cause
+	}
+	return nil
 }
 
 func IsNetworkError(err error) bool {
@@ -59,13 +94,12 @@ func IsNetworkError(err error) bool {
 }
 
 func (c *Client) Authenticate(ctx context.Context, baseURL, email, password string) (string, error) {
+	sdkClient := c.newSDKClient(baseURL)
+	payload := map[string]string{"identity": email, "password": password}
 	targets := []string{
 		"/api/collections/_superusers/auth-with-password",
 		"/api/admins/auth-with-password",
 	}
-
-	payload := map[string]string{"identity": email, "password": password}
-	body, _ := json.Marshal(payload)
 
 	var lastErr error
 	for _, endpoint := range targets {
@@ -73,36 +107,20 @@ func (c *Client) Authenticate(ctx context.Context, baseURL, email, password stri
 		if err != nil {
 			return "", err
 		}
-
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(body))
-		if err != nil {
-			return "", err
-		}
-		req.Header.Set("Content-Type", "application/json")
-
-		resp, err := c.httpClient.Do(req)
-		if err != nil {
-			lastErr = err
+		var response map[string]any
+		if err := sdkClient.Send(ctx, http.MethodPost, u, payload, &response); err != nil {
+			mapped := mapSDKError(err)
+			var authErr *AuthError
+			if errors.As(mapped, &authErr) {
+				return "", mapped
+			}
+			lastErr = mapped
 			continue
 		}
-		respBody, _ := io.ReadAll(resp.Body)
-		_ = resp.Body.Close()
-
-		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-			return "", &AuthError{Message: "authentication failed"}
-		}
-		if resp.StatusCode >= 400 {
-			lastErr = &APIError{Status: resp.StatusCode, Body: string(respBody)}
-			continue
-		}
-
-		var parsed map[string]any
-		if err := json.Unmarshal(respBody, &parsed); err != nil {
-			return "", err
-		}
-		token, _ := parsed["token"].(string)
+		token, _ := response["token"].(string)
 		if strings.TrimSpace(token) == "" {
-			return "", errors.New("authentication token is empty")
+			lastErr = errors.New("authentication token is empty")
+			continue
 		}
 		return token, nil
 	}
@@ -117,6 +135,7 @@ func (c *Client) GetJSON(ctx context.Context, baseURL, token, endpoint string, q
 	if err != nil {
 		return nil, err
 	}
+
 	parsedURL, err := url.Parse(u)
 	if err != nil {
 		return nil, err
@@ -129,38 +148,68 @@ func (c *Client) GetJSON(ctx context.Context, baseURL, token, endpoint string, q
 	}
 	parsedURL.RawQuery = q.Encode()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, parsedURL.String(), nil)
-	if err != nil {
-		return nil, err
+	sdkClient := c.newSDKClient(baseURL)
+	if formatted := formatTokenForAuthorization(token); formatted != "" {
+		sdkClient.WithToken(formatted)
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-		return nil, &AuthError{Message: "authentication failed"}
-	}
-	if resp.StatusCode >= 400 {
-		return nil, &APIError{Status: resp.StatusCode, Body: string(body)}
+	var raw json.RawMessage
+	if err := sdkClient.Send(ctx, http.MethodGet, parsedURL.String(), nil, &raw); err != nil {
+		return nil, mapSDKError(err)
 	}
 
 	var parsed map[string]any
-	if err := json.Unmarshal(body, &parsed); err == nil {
+	if err := json.Unmarshal(raw, &parsed); err == nil {
 		return parsed, nil
 	}
 	var list []any
-	if err := json.Unmarshal(body, &list); err == nil {
+	if err := json.Unmarshal(raw, &list); err == nil {
 		return map[string]any{"items": list}, nil
 	}
 	return nil, errors.New("unsupported pocketbase response body")
+}
+
+func (c *Client) newSDKClient(baseURL string) *pbclient.Client {
+	httpClient := c.httpClient
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: 15 * time.Second}
+	}
+	return pbclient.NewClient(baseURL, pbclient.WithHTTPClient(httpClient))
+}
+
+func mapSDKError(err error) error {
+	if err == nil {
+		return nil
+	}
+	var pbErr *pbclient.Error
+	if !errors.As(err, &pbErr) {
+		return err
+	}
+	if pbErr.IsAuth() || pbclient.IsAuthenticationFailed(err) {
+		return &AuthError{
+			Status:  pbErr.Status,
+			Code:    pbErr.Code,
+			Message: strings.TrimSpace(pbErr.Message),
+			Cause:   err,
+		}
+	}
+	return &APIError{
+		Status:  pbErr.Status,
+		Code:    pbErr.Code,
+		Message: strings.TrimSpace(pbErr.Message),
+		Cause:   err,
+	}
+}
+
+func formatTokenForAuthorization(token string) string {
+	tok := strings.TrimSpace(token)
+	if tok == "" {
+		return ""
+	}
+	if strings.HasPrefix(strings.ToLower(tok), "bearer ") {
+		return tok
+	}
+	return "Bearer " + tok
 }
 
 func joinURL(baseURL, endpoint string) (string, error) {

@@ -98,7 +98,7 @@ func (ui *recordsTUI) setupViews() {
 		ui.renderDetail()
 	})
 
-	ui.helpView.SetText("q/esc quit  j/k move  h/l horiz  / filter  s sort  c columns  [/] page  g/G first/last  r refresh  Enter detail")
+	ui.helpView.SetText("q/esc quit  j/k move  h/l or <-/-> horiz  / filter  s sort  c columns  [/] page  g/G first/last  r refresh  Enter detail")
 
 	ui.detailView.SetTextAlign(tview.AlignLeft)
 	ui.detailView.SetDynamicColors(true)
@@ -130,6 +130,12 @@ func (ui *recordsTUI) handleKey(event *tcell.EventKey) *tcell.EventKey {
 	case tcell.KeyEnter:
 		ui.toggleDetail()
 		return nil
+	case tcell.KeyLeft:
+		ui.shiftColumns(-1)
+		return nil
+	case tcell.KeyRight:
+		ui.shiftColumns(1)
+		return nil
 	}
 
 	switch event.Rune() {
@@ -143,17 +149,10 @@ func (ui *recordsTUI) handleKey(event *tcell.EventKey) *tcell.EventKey {
 		ui.moveSelection(-1)
 		return nil
 	case 'h':
-		if ui.columnOffset > 0 {
-			ui.columnOffset--
-			ui.renderTable()
-		}
+		ui.shiftColumns(-1)
 		return nil
 	case 'l':
-		all := ui.currentColumns()
-		if ui.columnOffset+visibleColumnWindow < len(all) {
-			ui.columnOffset++
-			ui.renderTable()
-		}
+		ui.shiftColumns(1)
 		return nil
 	case '/':
 		ui.openInputModal("Filter", "filter", ui.state.Filter, func(val string) error {
@@ -199,6 +198,26 @@ func (ui *recordsTUI) handleKey(event *tcell.EventKey) *tcell.EventKey {
 		return nil
 	}
 	return event
+}
+
+func (ui *recordsTUI) shiftColumns(delta int) {
+	if delta == 0 {
+		return
+	}
+	if delta < 0 {
+		if ui.columnOffset == 0 {
+			return
+		}
+		ui.columnOffset--
+		ui.renderTable()
+		return
+	}
+	all := ui.currentColumns()
+	if ui.columnOffset+visibleColumnWindow >= len(all) {
+		return
+	}
+	ui.columnOffset++
+	ui.renderTable()
 }
 
 func (ui *recordsTUI) fetch() error {

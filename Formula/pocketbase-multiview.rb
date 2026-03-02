@@ -1,7 +1,7 @@
 class PocketbaseMultiview < Formula
   desc "CLI tool for exploring multiple PocketBase instances"
   homepage "https://github.com/jiseop121/multi-pocketbase-ui"
-  version "0.3.0"
+  version "0.3.1"
 
   on_macos do
     if Hardware::CPU.arm?
