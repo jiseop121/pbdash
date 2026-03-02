@@ -94,6 +94,23 @@ func TestRunREPLContinuesAfterCommandError(t *testing.T) {
 	}
 }
 
+func TestRunREPLStopsOnPrefixedExitCommand(t *testing.T) {
+	stdin := bytes.NewBufferString("version\npbviewer exit\nversion\n")
+	stdout := bytes.NewBuffer(nil)
+	stderr := bytes.NewBuffer(nil)
+
+	code := Run(context.Background(), []string{}, stdin, stdout, stderr)
+	if code != 0 {
+		t.Fatalf("exit code mismatch: got=%d want=0", code)
+	}
+	if count := strings.Count(stdout.String(), Version); count != 1 {
+		t.Fatalf("repl should stop at prefixed exit command, version output count=%d, stdout=%q", count, stdout.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("unexpected stderr output: %q", stderr.String())
+	}
+}
+
 func TestRunScriptContinuesAfterCommandError(t *testing.T) {
 	tempDir := t.TempDir()
 	scriptPath := filepath.Join(tempDir, "script.txt")

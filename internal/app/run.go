@@ -11,7 +11,7 @@ import (
 	"multi-pocketbase-ui/internal/cli"
 )
 
-const Version = "0.2.1"
+const Version = "0.2.2"
 
 type modeResult struct {
 	err             error
@@ -96,12 +96,18 @@ func runREPL(ctx context.Context, stdin io.Reader, stdout io.Writer, stderr io.W
 		if execErr == nil {
 			return nil
 		}
+		if errors.Is(execErr, cli.ErrExitRequested) {
+			return execErr
+		}
 		writeError(stderr, execErr)
 		lastErr = execErr
 		return nil
 	})
 
 	if err != nil {
+		if errors.Is(err, cli.ErrExitRequested) {
+			return modeResult{}
+		}
 		return modeResult{err: err}
 	}
 	if lastErr == nil {

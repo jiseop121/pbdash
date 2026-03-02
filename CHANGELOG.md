@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.2] - 2026-03-02
+
+### Changed
+- Renamed CLI binary from `pbmulti` to `pbviewer` across command surface, docs, and release scripts.
+- Updated runtime/script behavior to continue after per-command failures and return the last non-zero error code.
+
+### Breaking
+- Replaced `PBMULTI_HOME` with `PBVIEWER_HOME`.
+- Replaced `PBMULTI_SUPERUSER_KEY_B64` with `PBVIEWER_SUPERUSER_KEY_B64`.
+
 ## [0.2.1] - 2026-03-02
 
 ### Added
