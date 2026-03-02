@@ -190,3 +190,30 @@ func TestRunScriptExitStopsFurtherCommands(t *testing.T) {
 		t.Fatalf("missing script error output before exit: %s", stderr.String())
 	}
 }
+
+func TestRunPrintsStartupErrorWhenSavedContextIsCorrupted(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("PBVIEWER_HOME", home)
+	contextPath := filepath.Join(home, "context.json")
+	if err := os.WriteFile(contextPath, []byte("{bad json"), 0o600); err != nil {
+		t.Fatalf("write broken context: %v", err)
+	}
+
+	stdin := bytes.NewBuffer(nil)
+	stdout := bytes.NewBuffer(nil)
+	stderr := bytes.NewBuffer(nil)
+
+	code := Run(context.Background(), []string{"-c", "version"}, stdin, stdout, stderr)
+	if code != 0 {
+		t.Fatalf("exit code mismatch: got=%d want=0", code)
+	}
+	if strings.TrimSpace(stdout.String()) != Version {
+		t.Fatalf("version output mismatch: %q", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "Could not load saved default context.") {
+		t.Fatalf("expected startup context error: %s", stderr.String())
+	}
+	if !strings.Contains(stderr.String(), contextPath) {
+		t.Fatalf("expected context path in startup hint: %s", stderr.String())
+	}
+}

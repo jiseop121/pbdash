@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -196,6 +198,27 @@ func TestContextSaveAndLoadAcrossDispatcherInstances(t *testing.T) {
 	d2 := NewDispatcher(DispatcherConfig{Stdout: buf, Version: "test", DataDir: dataDir})
 	if err := d2.Execute(context.Background(), "api collections"); err != nil {
 		t.Fatalf("api collections with saved context: %v", err)
+	}
+}
+
+func TestNewDispatcherReportsContextLoadError(t *testing.T) {
+	dataDir := t.TempDir()
+	contextPath := filepath.Join(dataDir, "context.json")
+	if err := os.WriteFile(contextPath, []byte("{broken json"), 0o600); err != nil {
+		t.Fatalf("write broken context: %v", err)
+	}
+
+	d := NewDispatcher(DispatcherConfig{Stdout: bytes.NewBuffer(nil), Version: "test", DataDir: dataDir})
+	errs := d.StartupErrors()
+	if len(errs) != 1 {
+		t.Fatalf("startup error count mismatch: got=%d want=1", len(errs))
+	}
+	formatted := apperr.Format(errs[0])
+	if !strings.Contains(formatted, "Could not load saved default context.") {
+		t.Fatalf("missing startup error message: %s", formatted)
+	}
+	if !strings.Contains(formatted, contextPath) {
+		t.Fatalf("missing context path in startup hint: %s", formatted)
 	}
 }
 

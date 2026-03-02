@@ -1,15 +1,15 @@
 class PocketbaseMultiview < Formula
   desc "CLI tool for exploring multiple PocketBase instances"
   homepage "https://github.com/jiseop121/multi-pocketbase-ui"
-  version "0.2.2"
+  version "0.3.0"
 
   on_macos do
     if Hardware::CPU.arm?
-      url "https://github.com/jiseop121/multi-pocketbase-ui/releases/download/v0.2.2/pbviewer-v0.2.2-darwin-arm64.tar.gz"
-      sha256 "203493fc8cadbce16c87da9c3e1634e17d4660f83f57477dd44266d3527b1e97"
+      url "https://github.com/jiseop121/multi-pocketbase-ui/releases/download/v0.3.0/pbviewer-v0.3.0-darwin-arm64.tar.gz"
+      sha256 "08e649527cffc0490745f272f5c04d50caf6fa19251d481cda9a806cbae1157c"
     else
-      url "https://github.com/jiseop121/multi-pocketbase-ui/releases/download/v0.2.2/pbviewer-v0.2.2-darwin-amd64.tar.gz"
-      sha256 "28455f9aa29aa5882287f0d3695c99811b27118efd441f057a499f91242e3a9b"
+      url "https://github.com/jiseop121/multi-pocketbase-ui/releases/download/v0.3.0/pbviewer-v0.3.0-darwin-amd64.tar.gz"
+      sha256 "299646a1f34762f6c138086d75650723526bc35f0e8ca1304eb352266ce4c373"
     end
   end
 

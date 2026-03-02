@@ -31,6 +31,9 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 		Version: Version,
 		DataDir: dataDir,
 	})
+	for _, startupErr := range dispatcher.StartupErrors() {
+		writeError(cfg.Stderr, startupErr)
+	}
 
 	result := modeResult{}
 	mode := ResolveMode(cfg)
