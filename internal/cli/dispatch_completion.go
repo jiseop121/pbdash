@@ -171,9 +171,10 @@ func filterPrefix(candidates []string, prefix string) []string {
 	if len(candidates) == 0 {
 		return nil
 	}
+	lowerPrefix := strings.ToLower(prefix)
 	out := make([]string, 0, len(candidates))
 	for _, item := range candidates {
-		if strings.HasPrefix(item, prefix) {
+		if strings.HasPrefix(strings.ToLower(item), lowerPrefix) {
 			out = append(out, item)
 		}
 	}

@@ -29,6 +29,16 @@ func TestCompleteSuggestsDBAndSuperuserAliases(t *testing.T) {
 	mustContain(t, suSuggestions, "root")
 }
 
+func TestCompleteMatchesPrefixCaseInsensitively(t *testing.T) {
+	d := NewDispatcher(DispatcherConfig{Stdout: bytes.NewBuffer(nil), Version: "test", DataDir: t.TempDir()})
+	if err := d.dbStore.Add("Prod", "http://127.0.0.1:8090"); err != nil {
+		t.Fatalf("add db: %v", err)
+	}
+
+	got := d.Complete("api records --db p")
+	mustContain(t, got, "Prod")
+}
+
 func TestCompleteSuggestsViewModes(t *testing.T) {
 	d := NewDispatcher(DispatcherConfig{Stdout: bytes.NewBuffer(nil), Version: "test", DataDir: t.TempDir()})
 	got := d.Complete("api records --view ")
