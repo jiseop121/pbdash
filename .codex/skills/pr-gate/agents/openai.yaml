@@ -1,4 +1,0 @@
-interface:
-  display_name: "PR Gate"
-  short_description: "Run quality gates and summarize merge readiness for PRs."
-  default_prompt: "Use $pr-gate to run tests, vet checks, and report merge blockers."
