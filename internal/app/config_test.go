@@ -12,7 +12,8 @@ func TestParseRunConfigModesAndConflicts(t *testing.T) {
 		wantMode  ExecMode
 		wantError bool
 	}{
-		{name: "repl", args: []string{}, wantMode: ModeREPL},
+		{name: "tui", args: []string{}, wantMode: ModeTUI},
+		{name: "repl", args: []string{"-repl"}, wantMode: ModeREPL},
 		{name: "one shot", args: []string{"-c", "version"}, wantMode: ModeOneShot},
 		{name: "one shot empty command text", args: []string{"-c", ""}, wantError: true},
 		{name: "script", args: []string{"script.txt"}, wantMode: ModeScript},
@@ -20,6 +21,7 @@ func TestParseRunConfigModesAndConflicts(t *testing.T) {
 		{name: "conflict c and script", args: []string{"-c", "version", "script.txt"}, wantError: true},
 		{name: "conflict ui and c", args: []string{"-ui", "-c", "version"}, wantError: true},
 		{name: "conflict ui and script", args: []string{"-ui", "script.txt"}, wantError: true},
+		{name: "conflict repl and c", args: []string{"-repl", "-c", "version"}, wantError: true},
 	}
 
 	for _, tc := range tests {

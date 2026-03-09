@@ -21,8 +21,25 @@ func TestRunUIReserved(t *testing.T) {
 	if stdout.Len() != 0 {
 		t.Fatalf("expected empty stdout")
 	}
-	if !strings.Contains(stderr.String(), "Error: UI mode is not available in Track 1.") {
+	if !strings.Contains(stderr.String(), "Error: Web UI is under development.") {
 		t.Fatalf("missing ui error message: %s", stderr.String())
+	}
+}
+
+func TestRunDefaultTUINonTTYReturnsHelpfulError(t *testing.T) {
+	stdin := bytes.NewBuffer(nil)
+	stdout := bytes.NewBuffer(nil)
+	stderr := bytes.NewBuffer(nil)
+
+	code := Run(context.Background(), nil, stdin, stdout, stderr)
+	if code != 2 {
+		t.Fatalf("exit code mismatch: got=%d want=2", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("expected empty stdout")
+	}
+	if !strings.Contains(stderr.String(), "Default TUI mode requires a TTY terminal.") {
+		t.Fatalf("missing non-tty tui message: %s", stderr.String())
 	}
 }
 
@@ -82,7 +99,7 @@ func TestRunREPLContinuesAfterCommandError(t *testing.T) {
 	stdout := bytes.NewBuffer(nil)
 	stderr := bytes.NewBuffer(nil)
 
-	code := Run(context.Background(), []string{}, stdin, stdout, stderr)
+	code := Run(context.Background(), []string{"-repl"}, stdin, stdout, stderr)
 	if code != 2 {
 		t.Fatalf("exit code mismatch: got=%d want=2", code)
 	}
@@ -99,7 +116,7 @@ func TestRunREPLStopsOnPrefixedExitCommand(t *testing.T) {
 	stdout := bytes.NewBuffer(nil)
 	stderr := bytes.NewBuffer(nil)
 
-	code := Run(context.Background(), []string{}, stdin, stdout, stderr)
+	code := Run(context.Background(), []string{"-repl"}, stdin, stdout, stderr)
 	if code != 0 {
 		t.Fatalf("exit code mismatch: got=%d want=0", code)
 	}

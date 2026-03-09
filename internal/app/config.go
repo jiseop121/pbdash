@@ -8,6 +8,7 @@ import (
 type ExecMode string
 
 const (
+	ModeTUI        ExecMode = "tui"
 	ModeREPL       ExecMode = "repl"
 	ModeOneShot    ExecMode = "one-shot"
 	ModeScript     ExecMode = "script"
@@ -16,6 +17,7 @@ const (
 
 type RunConfig struct {
 	UIEnabled   bool
+	REPLEnabled bool
 	CommandText string
 	ScriptPath  string
 	Stdout      io.Writer
@@ -31,6 +33,8 @@ func ParseRunConfig(args []string, stdin io.Reader, stdout, stderr io.Writer) (R
 		switch arg {
 		case "-ui":
 			cfg.UIEnabled = true
+		case "-repl":
+			cfg.REPLEnabled = true
 		case "-c":
 			if i+1 >= len(args) {
 				return cfg, NewInvalidArgsError("Missing command text for `-c`.", "Example: pbdash -c \"version\"")
@@ -67,8 +71,11 @@ func ValidateRunConfig(cfg RunConfig) error {
 	if cfg.CommandText != "" && cfg.ScriptPath != "" {
 		return NewInvalidArgsError("Cannot use `-c` and script file path together.", "Choose one mode: `pbdash -c \"...\"` or `pbdash <script-file>`")
 	}
-	if cfg.UIEnabled && (cfg.CommandText != "" || cfg.ScriptPath != "") {
-		return NewInvalidArgsError("`-ui` cannot be used with `-c` or script mode.", "Run `pbdash -ui` alone.")
+	if cfg.UIEnabled && (cfg.CommandText != "" || cfg.ScriptPath != "" || cfg.REPLEnabled) {
+		return NewInvalidArgsError("`-ui` cannot be used with `-c`, script, or `-repl` mode.", "Run `pbdash -ui` alone.")
+	}
+	if cfg.REPLEnabled && (cfg.CommandText != "" || cfg.ScriptPath != "") {
+		return NewInvalidArgsError("`-repl` cannot be used with `-c` or script mode.", "Run `pbdash -repl` alone.")
 	}
 	return nil
 }
@@ -83,5 +90,8 @@ func ResolveMode(cfg RunConfig) ExecMode {
 	if cfg.ScriptPath != "" {
 		return ModeScript
 	}
-	return ModeREPL
+	if cfg.REPLEnabled {
+		return ModeREPL
+	}
+	return ModeTUI
 }

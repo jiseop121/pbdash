@@ -96,7 +96,7 @@ func (d *Dispatcher) execAPI(ctx context.Context, args []string) error {
 		if err != nil {
 			return err
 		}
-		shouldTUI, err := shouldUseRecordsTUI(normalizedView, normalizedFormat, d.IsInteractiveTTY())
+		shouldTUI, err := shouldUseRecordsTUI(normalizedView, normalizedFormat, d.HasTTY())
 		if err != nil {
 			return err
 		}
@@ -180,19 +180,19 @@ func normalizeView(view string) (string, error) {
 	}
 }
 
-func shouldUseRecordsTUI(view, format string, interactiveTTY bool) (bool, error) {
+func shouldUseRecordsTUI(view, format string, hasTTY bool) (bool, error) {
 	if view == "tui" && format != "table" {
 		return false, apperr.Invalid("`--view tui` requires `--format table`.", "Use `--format table` or switch view to `table`/`auto`.")
 	}
 
 	switch view {
 	case "tui":
-		if !interactiveTTY {
-			return false, apperr.Invalid("`--view tui` requires interactive REPL TTY mode.", "Run `pbdash` in a terminal and execute this command there.")
+		if !hasTTY {
+			return false, apperr.Invalid("`--view tui` requires a TTY terminal.", "Run `pbdash` in a terminal and execute this command there.")
 		}
 		return true, nil
 	case "auto":
-		return format == "table" && interactiveTTY, nil
+		return format == "table" && hasTTY, nil
 	case "table":
 		return false, nil
 	default:
