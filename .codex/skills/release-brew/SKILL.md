@@ -1,37 +1,26 @@
 ---
 name: release-brew
-description: Build and publish macOS Homebrew release artifacts for pbviewer, update the tap formula, and verify installation. Use when users ask to release a new version, refresh formula SHA/URL, fix Homebrew distribution, or run end-to-end brew delivery checks.
+description: Build and publish macOS Homebrew release artifacts for pbdash, update Formula/pbdash.rb in the same repository, and verify installation. Use when users ask to release a new version, refresh the Homebrew formula SHA/URL, fix brew distribution, or run end-to-end brew delivery checks.
 ---
 
 # Release Brew
 
-## Overview
-
-Use this skill to execute a deterministic Homebrew release flow for `pbviewer`.
-Prefer the bundled script so versioning, artifact naming, SHA updates, and brew install checks stay consistent.
-
 ## Workflow
 
-1. Confirm release inputs.
-2. Run `scripts/release_brew.sh` with explicit paths and version.
-3. Verify script output for release URL, formula update, and brew smoke pass.
-4. If needed, inspect [references/release-inputs.md](references/release-inputs.md) for naming and assumptions.
+Use this skill to publish a `pbdash` Homebrew release from this repository and verify installability.
 
-## Run
-
-```bash
-./scripts/release_brew.sh \
-  --version <semver> \
-  --source-repo-dir <path-to-multi-pocketbase-ui> \
-  --tap-repo-dir <path-to-homebrew-repo> \
-  --tap-github-repo <owner/homebrew-repo>
-```
-
-Use `--dry-run` first when validating changes without publishing.
+1. Confirm the target version and repository state.
+2. Create and push the release tag first with `make release-tag VERSION=<version>` if it does not already exist.
+3. Run `make release-brew VERSION=<version>`.
+4. Verify the release uploaded `pbdash-v<version>-darwin-arm64.tar.gz` and `pbdash-v<version>-darwin-amd64.tar.gz`.
+5. Verify [Formula/pbdash.rb](/Users/hjs/Personal/multi-pocketbase-ui/Formula/pbdash.rb) was updated and the brew smoke check passed.
 
 ## Guardrails
 
 - Keep release tag format as `v<version>`.
-- Keep artifact names as `<binary>-v<version>-darwin-<arch>.tar.gz`.
-- Publish binaries to the tap repository release to avoid private source build issues.
+- This project uses a single repository for source, release assets, and Homebrew formula: `jiseop121/pbdash`.
+- Keep the formula name and binary name as `pbdash`.
+- Build from `./cmd/pbdash`.
+- Keep artifact names as `pbdash-v<version>-darwin-<arch>.tar.gz`.
+- Do not run the brew release step before the tag exists on GitHub.
 - Fail on version mismatch in smoke checks.

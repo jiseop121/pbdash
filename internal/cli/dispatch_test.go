@@ -141,7 +141,10 @@ func TestHelpIncludesCommandDescriptions(t *testing.T) {
 		"api record --db <dbAlias> --superuser <superuserAlias> --collection <collectionName> --id <recordId>",
 		"Get one record by id.",
 		"csv/markdown requires --out <path>.",
-		"TUI view is available in interactive REPL TTY mode.",
+		"pbdash                         Start full-screen TUI mode.",
+		"pbdash -repl                   Start legacy REPL mode.",
+		"pbdash -ui                     Reserved for the future web UI (currently under development).",
+		"TUI view requires a TTY terminal.",
 	}
 
 	for _, token := range required {
@@ -239,7 +242,7 @@ func TestAPIRecordsViewTUIRequiresInteractiveTTY(t *testing.T) {
 	if apperr.ExitCode(err) != 2 {
 		t.Fatalf("exit code mismatch: got=%d want=2", apperr.ExitCode(err))
 	}
-	if !strings.Contains(apperr.Format(err), "interactive REPL TTY mode") {
+	if !strings.Contains(apperr.Format(err), "requires a TTY terminal") {
 		t.Fatalf("unexpected error: %s", apperr.Format(err))
 	}
 }

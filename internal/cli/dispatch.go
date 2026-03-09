@@ -53,6 +53,8 @@ type Dispatcher struct {
 	authCache map[authCacheKey]authCacheEntry
 	now       func() time.Time
 
+	navigatorRunner func(context.Context, navigatorRoute) error
+
 	startupErrs []error
 }
 
@@ -67,6 +69,9 @@ func NewDispatcher(cfg DispatcherConfig) *Dispatcher {
 		authCache:   map[authCacheKey]authCacheEntry{},
 		now:         time.Now,
 		startupErrs: make([]error, 0),
+	}
+	d.navigatorRunner = func(ctx context.Context, route navigatorRoute) error {
+		return d.runNavigatorTUI(ctx, route)
 	}
 	if saved, ok, err := d.ctxStore.Load(); err == nil && ok {
 		d.savedCtx = commandContext{DBAlias: saved.DBAlias, SuperuserAlias: saved.SuperuserAlias}
@@ -91,13 +96,24 @@ func (d *Dispatcher) StartupErrors() []error {
 	return out
 }
 
-func (d *Dispatcher) SetREPLRuntime(isREPL, isTTY bool) {
-	d.isREPL = isREPL
+func (d *Dispatcher) SetTerminal(isTTY bool) {
 	d.isTTY = isTTY
+}
+
+func (d *Dispatcher) SetREPLRuntime(isREPL bool) {
+	d.isREPL = isREPL
+}
+
+func (d *Dispatcher) HasTTY() bool {
+	return d.isTTY
 }
 
 func (d *Dispatcher) IsInteractiveTTY() bool {
 	return d.isREPL && d.isTTY
+}
+
+func (d *Dispatcher) RunNavigator(ctx context.Context) error {
+	return d.navigatorRunner(ctx, navigatorRoute{})
 }
 
 func (d *Dispatcher) Execute(ctx context.Context, line string) error {
@@ -123,7 +139,7 @@ func (d *Dispatcher) Execute(ctx context.Context, line string) error {
 		_, _ = fmt.Fprintln(d.stdout, d.version)
 		return nil
 	case "ui":
-		return apperr.Invalid("UI mode is not available in Track 1.", "")
+		return apperr.Invalid("Web UI is under development.", "")
 	case "db":
 		return d.execDB(argsAfterHead(tokens))
 	case "superuser":
@@ -150,9 +166,11 @@ func (d *Dispatcher) printHelp() {
 	help := strings.TrimSpace(`pbdash command reference
 
 Run modes:
-  pbdash                         Start REPL mode.
+  pbdash                         Start full-screen TUI mode.
+  pbdash -repl                   Start legacy REPL mode.
   pbdash -c "<command>"          Run one command and exit.
   pbdash <script-file>           Execute commands from a script file.
+  pbdash -ui                     Reserved for the future web UI (currently under development).
 
 Core commands:
   version                         Print CLI version.
@@ -192,6 +210,6 @@ API commands (read-only GET):
 Output:
   Default format is table.
   csv/markdown requires --out <path>.
-  TUI view is available in interactive REPL TTY mode.`)
+  TUI view requires a TTY terminal.`)
 	_, _ = fmt.Fprintln(d.stdout, help)
 }

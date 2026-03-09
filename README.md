@@ -57,16 +57,40 @@ pbdash -c "api collections --db local --superuser root"
 pbdash -c "api records --db local --superuser root --collection posts --page 1 --per-page 20"
 ```
 
-### 5) REPL 기본 컨텍스트 설정
+### 5) TUI/REPL 진입
+
+기본 실행은 전면 TUI다.
+탐색 흐름은 `DB 목록 -> (필요 시 superuser 선택) -> collections -> records table` 순서다.
 
 ```bash
 pbdash
+```
+
+기존 REPL이 필요하면 `-repl`로 연다.
+
+```bash
+pbdash -repl
 pbdash> context use --db local --superuser root
 pbdash> context save
 pbdash> api records --collection posts
 ```
 
-### 6) REPL/script 에러 처리 규칙
+웹 UI 예약 옵션 `-ui`는 아직 개발중이다.
+
+```bash
+pbdash -ui
+```
+
+### 6) REPL 기본 컨텍스트 설정
+
+```bash
+pbdash -repl
+pbdash> context use --db local --superuser root
+pbdash> context save
+pbdash> api records --collection posts
+```
+
+### 7) REPL/script 에러 처리 규칙
 
 - `pbdash`(REPL)와 `pbdash <script-file>`는 명령 오류가 나도 다음 명령 실행을 계속합니다.
 - 세션 종료 코드는 마지막 오류 코드(`1/2/3`)를 따르며, 오류가 없으면 `0`입니다.
@@ -75,7 +99,7 @@ pbdash> api records --collection posts
 
 - 기본 포맷은 `table`입니다.
 - `--format csv|markdown`을 사용하면 `--out <path>`가 필수입니다.
-- `api records`는 REPL+TTY 환경에서 기본적으로 풀스크린 TUI(`--view auto`)로 표시됩니다.
+- `api records`는 TTY 환경에서 기본적으로 풀스크린 TUI(`--view auto`)로 표시됩니다.
 - `--view table`로 텍스트 테이블 출력을 강제할 수 있습니다.
 
 예시:
@@ -89,23 +113,23 @@ pbdash -c "api records --db local --superuser root --collection posts --format c
 태그를 푸시하면 GitHub Release 본문은 자동 생성된다.
 
 ```bash
-make release-tag VERSION=0.4.0
+make release-tag VERSION=0.4.1
 ```
 
 동작:
 - `go test ./...` 실행
-- `v0.4.0` 태그 생성 및 원격 푸시
+- `v0.4.1` 태그 생성 및 원격 푸시
 - GitHub Actions(`.github/workflows/release.yml`)가 Release를 생성/갱신하고 변경사항 노트를 자동 작성
 
 Homebrew 배포 파일(아티팩트 + Formula) 갱신:
 
 ```bash
-make release-brew VERSION=0.4.0
+make release-brew VERSION=0.4.1
 ```
 
 동작:
 - `darwin-arm64`, `darwin-amd64` 바이너리 tar.gz 빌드
-- 현재 레포 Release(`v0.4.0`)에 아티팩트 업로드
+- 현재 레포 Release(`v0.4.1`)에 아티팩트 업로드
 - `Formula/pbdash.rb` SHA/URL 갱신 후 커밋/푸시
 - Homebrew 설치 스모크 테스트
 

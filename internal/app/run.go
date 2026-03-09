@@ -11,7 +11,7 @@ import (
 	"github.com/jiseop121/pbdash/internal/cli"
 )
 
-const Version = "0.4.0"
+const Version = "0.4.1"
 
 type modeResult struct {
 	err             error
@@ -31,6 +31,8 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 		Version: Version,
 		DataDir: dataDir,
 	})
+	isTTY := cli.IsTTY(stdin, stdout)
+	dispatcher.SetTerminal(isTTY)
 	for _, startupErr := range dispatcher.StartupErrors() {
 		writeError(cfg.Stderr, startupErr)
 	}
@@ -39,7 +41,9 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 	mode := ResolveMode(cfg)
 	switch mode {
 	case ModeUIReserved:
-		result.err = NewInvalidArgsError("UI mode is not available in Track 1.", "")
+		result.err = NewInvalidArgsError("Web UI is under development.", "")
+	case ModeTUI:
+		result.err = runTUI(ctx, dispatcher)
 	case ModeOneShot:
 		result.err = runOneShot(ctx, cfg.CommandText, dispatcher)
 	case ModeScript:
@@ -58,6 +62,13 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 
 func runOneShot(ctx context.Context, commandText string, dispatcher *cli.Dispatcher) error {
 	return dispatcher.Execute(ctx, commandText)
+}
+
+func runTUI(ctx context.Context, dispatcher *cli.Dispatcher) error {
+	if !dispatcher.HasTTY() {
+		return NewInvalidArgsError("Default TUI mode requires a TTY terminal.", "Use `pbdash -repl`, `pbdash -c \"...\"`, or `pbdash <script-file>` in non-interactive environments.")
+	}
+	return dispatcher.RunNavigator(ctx)
 }
 
 func runScript(ctx context.Context, path string, stderr io.Writer, dispatcher *cli.Dispatcher) modeResult {
@@ -95,8 +106,7 @@ func runScript(ctx context.Context, path string, stderr io.Writer, dispatcher *c
 func runREPL(ctx context.Context, stdin io.Reader, stdout io.Writer, stderr io.Writer, dataDir string, dispatcher *cli.Dispatcher) modeResult {
 	var lastErr error
 
-	isTTY := cli.IsTTY(stdin, stdout)
-	dispatcher.SetREPLRuntime(true, isTTY)
+	dispatcher.SetREPLRuntime(true)
 	err := cli.RunREPLWithConfig(ctx, cli.REPLConfig{
 		Stdin:       stdin,
 		Stdout:      stdout,

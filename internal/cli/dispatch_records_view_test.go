@@ -19,7 +19,7 @@ func TestShouldUseRecordsTUI(t *testing.T) {
 		{name: "auto csv", view: "auto", format: "csv", interactive: true, want: false},
 		{name: "table explicit", view: "table", format: "table", interactive: true, want: false},
 		{name: "tui interactive", view: "tui", format: "table", interactive: true, want: true},
-		{name: "tui non interactive", view: "tui", format: "table", interactive: false, wantErr: "interactive REPL TTY mode"},
+		{name: "tui non interactive", view: "tui", format: "table", interactive: false, wantErr: "requires a TTY terminal"},
 		{name: "tui requires table", view: "tui", format: "csv", interactive: true, wantErr: "requires `--format table`"},
 	}
 

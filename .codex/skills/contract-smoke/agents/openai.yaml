@@ -1,4 +1,0 @@
-interface:
-  display_name: "Contract Smoke"
-  short_description: "Validate CLI contract behaviors with deterministic smoke checks."
-  default_prompt: "Use $contract-smoke to verify exit codes and stdout/stderr contract behavior."

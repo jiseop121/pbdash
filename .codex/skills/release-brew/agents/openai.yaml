@@ -1,4 +1,4 @@
 interface:
   display_name: "Release Brew"
-  short_description: "Build and publish Homebrew release artifacts safely."
-  default_prompt: "Use $release-brew to build binaries, update the tap formula, and verify brew install."
+  short_description: "Release pbdash Homebrew artifacts and verify brew install."
+  default_prompt: "Use $release-brew to publish a pbdash release, update Formula/pbdash.rb, and verify Homebrew installation."
