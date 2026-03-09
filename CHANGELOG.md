@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.1] - 2026-03-10
+
+### Added
+- Added `k9s`-style full-screen TUI navigation across saved db aliases, conditional superuser selection, collections, and records.
+- Added `pbdash -repl` for explicit access to the legacy REPL flow now that the default entrypoint opens the TUI.
+
+### Changed
+- Made bare `pbdash` launch the full-screen navigator TUI instead of the REPL.
+- Changed `api records --view auto|tui` to reuse the navigator-based TUI when a TTY is available.
+- Reserved `-ui` for the future web UI and changed its current behavior to return an "under development" message.
+
 ## [0.4.0] - 2026-03-09
 
 ### Changed
