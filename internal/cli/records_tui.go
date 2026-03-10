@@ -81,6 +81,60 @@ type superuserManagerState struct {
 	selectedAlias string
 }
 
+func newDBManagerState(items []storage.DB) dbManagerState {
+	return dbManagerState{items: items}
+}
+
+func (m dbManagerState) choices() []string {
+	return dbManagerChoices(m.items)
+}
+
+func (m *dbManagerState) selectAlias(value string) (storage.DB, bool) {
+	m.selectedAlias = normalizeManagerSelection(value)
+	return findDB(m.items, m.selectedAlias)
+}
+
+func (m dbManagerState) save(dispatcher *Dispatcher, alias, baseURL string) error {
+	if m.selectedAlias == "" {
+		_, err := dispatcher.saveDBAlias(alias, baseURL)
+		return err
+	}
+
+	_, err := dispatcher.updateDBAlias(m.selectedAlias, alias, baseURL)
+	return err
+}
+
+func (m dbManagerState) remove(dispatcher *Dispatcher) error {
+	if m.selectedAlias == "" {
+		return apperr.Invalid("Select an existing db alias first.", "Choose a saved db alias from the target field.")
+	}
+
+	return dispatcher.removeDBAlias(m.selectedAlias)
+}
+
+func (m *superuserManagerState) selectAlias(value string) (storage.Superuser, bool) {
+	m.selectedAlias = normalizeManagerSelection(value)
+	return findSuperuser(m.superusers, m.selectedAlias)
+}
+
+func (m superuserManagerState) save(dispatcher *Dispatcher, alias, email, password string) error {
+	if m.selectedAlias == "" {
+		_, err := dispatcher.saveSuperuser(m.selectedDB, alias, email, password)
+		return err
+	}
+
+	_, err := dispatcher.updateSuperuser(m.selectedDB, m.selectedAlias, alias, email, password)
+	return err
+}
+
+func (m superuserManagerState) remove(dispatcher *Dispatcher) error {
+	if m.selectedAlias == "" {
+		return apperr.Invalid("Select an existing superuser first.", "Choose a saved superuser from the target field.")
+	}
+
+	return dispatcher.removeSuperuser(m.selectedDB, m.selectedAlias)
+}
+
 func (d *Dispatcher) RunRecordsTUI(ctx context.Context, target pbTarget, state RecordsQueryState) error {
 	return d.runRecordsTUI(ctx, target, state)
 }
@@ -888,9 +942,9 @@ func (ui *navigatorTUI) openDBManagerModal() {
 		return
 	}
 
-	manager := dbManagerState{items: items}
+	manager := newDBManagerState(items)
 	form := tview.NewForm()
-	form.AddDropDown("target", dbManagerChoices(items), 0, nil)
+	form.AddDropDown("target", manager.choices(), 0, nil)
 	form.AddInputField("alias", "", 0, nil, nil)
 	form.AddInputField("base url", "", 0, nil, nil)
 
@@ -898,58 +952,16 @@ func (ui *navigatorTUI) openDBManagerModal() {
 	aliasField := form.GetFormItem(1).(*tview.InputField)
 	baseURLField := form.GetFormItem(2).(*tview.InputField)
 
-	applySelection := func(text string) {
-		manager.selectedAlias = normalizeManagerSelection(text)
-		db, ok := findDB(items, manager.selectedAlias)
-		if !ok {
-			aliasField.SetText("")
-			baseURLField.SetText("")
-			return
-		}
-		aliasField.SetText(db.Alias)
-		baseURLField.SetText(db.BaseURL)
-	}
-
 	dropdown.SetSelectedFunc(func(text string, _ int) {
-		applySelection(text)
+		applyDBFormSelection(&manager, aliasField, baseURLField, text)
 	})
-	applySelection(managerNewOption)
+	applyDBFormSelection(&manager, aliasField, baseURLField, managerNewOption)
 
 	form.AddButton("Save", func() {
-		ui.closeModal("db-manager")
-		var saveErr error
-		if manager.selectedAlias == "" {
-			_, saveErr = ui.dispatcher.saveDBAlias(aliasField.GetText(), baseURLField.GetText())
-		} else {
-			_, saveErr = ui.dispatcher.updateDBAlias(manager.selectedAlias, aliasField.GetText(), baseURLField.GetText())
-		}
-		if saveErr != nil {
-			ui.showError(saveErr)
-			return
-		}
-		if err := ui.syncLocalConfigState(); err != nil {
-			ui.showError(err)
-			return
-		}
-		ui.statusMessage = "db aliases updated"
-		ui.renderCurrentScreen()
+		ui.saveDBManager(manager, aliasField.GetText(), baseURLField.GetText())
 	})
 	form.AddButton("Delete", func() {
-		if manager.selectedAlias == "" {
-			ui.showError(apperr.Invalid("Select an existing db alias first.", "Choose a saved db alias from the target field."))
-			return
-		}
-		ui.closeModal("db-manager")
-		if err := ui.dispatcher.removeDBAlias(manager.selectedAlias); err != nil {
-			ui.showError(err)
-			return
-		}
-		if err := ui.syncLocalConfigState(); err != nil {
-			ui.showError(err)
-			return
-		}
-		ui.statusMessage = dbDeleteStatus(ui.target.DB.Alias, manager.selectedAlias)
-		ui.renderCurrentScreen()
+		ui.deleteDBManager(manager)
 	})
 	form.AddButton("Close", func() {
 		ui.closeModal("db-manager")
@@ -992,20 +1004,6 @@ func (ui *navigatorTUI) openSuperuserManagerModal() {
 	emailField := form.GetFormItem(3).(*tview.InputField)
 	passwordField := form.GetFormItem(4).(*tview.InputField)
 
-	applySelection := func(text string) {
-		manager.selectedAlias = normalizeManagerSelection(text)
-		su, ok := findSuperuser(manager.superusers, manager.selectedAlias)
-		if !ok {
-			aliasField.SetText("")
-			emailField.SetText("")
-			passwordField.SetText("")
-			return
-		}
-		aliasField.SetText(su.Alias)
-		emailField.SetText(su.Email)
-		passwordField.SetText("")
-	}
-
 	dbDropdown.SetSelectedFunc(func(text string, _ int) {
 		manager.selectedDB = text
 		if err := manager.loadSuperusers(ui.dispatcher); err != nil {
@@ -1013,51 +1011,21 @@ func (ui *navigatorTUI) openSuperuserManagerModal() {
 			return
 		}
 		targetDropdown.SetOptions(manager.aliasChoices(), func(option string, _ int) {
-			applySelection(option)
+			applySuperuserFormSelection(&manager, aliasField, emailField, passwordField, option)
 		})
 		targetDropdown.SetCurrentOption(0)
-		applySelection(managerNewOption)
+		applySuperuserFormSelection(&manager, aliasField, emailField, passwordField, managerNewOption)
 	})
 	targetDropdown.SetSelectedFunc(func(text string, _ int) {
-		applySelection(text)
+		applySuperuserFormSelection(&manager, aliasField, emailField, passwordField, text)
 	})
-	applySelection(managerNewOption)
+	applySuperuserFormSelection(&manager, aliasField, emailField, passwordField, managerNewOption)
 
 	form.AddButton("Save", func() {
-		ui.closeModal("superuser-manager")
-		var saveErr error
-		if manager.selectedAlias == "" {
-			_, saveErr = ui.dispatcher.saveSuperuser(manager.selectedDB, aliasField.GetText(), emailField.GetText(), passwordField.GetText())
-		} else {
-			_, saveErr = ui.dispatcher.updateSuperuser(manager.selectedDB, manager.selectedAlias, aliasField.GetText(), emailField.GetText(), passwordField.GetText())
-		}
-		if saveErr != nil {
-			ui.showError(saveErr)
-			return
-		}
-		if err := ui.syncLocalConfigState(); err != nil {
-			ui.showError(err)
-			return
-		}
-		ui.statusMessage = "superusers updated"
-		ui.renderCurrentScreen()
+		ui.saveSuperuserManager(manager, aliasField.GetText(), emailField.GetText(), passwordField.GetText())
 	})
 	form.AddButton("Delete", func() {
-		if manager.selectedAlias == "" {
-			ui.showError(apperr.Invalid("Select an existing superuser first.", "Choose a saved superuser from the target field."))
-			return
-		}
-		ui.closeModal("superuser-manager")
-		if err := ui.dispatcher.removeSuperuser(manager.selectedDB, manager.selectedAlias); err != nil {
-			ui.showError(err)
-			return
-		}
-		if err := ui.syncLocalConfigState(); err != nil {
-			ui.showError(err)
-			return
-		}
-		ui.statusMessage = superuserDeleteStatus(ui.target, manager.selectedDB, manager.selectedAlias)
-		ui.renderCurrentScreen()
+		ui.deleteSuperuserManager(manager)
 	})
 	form.AddButton("Close", func() {
 		ui.closeModal("superuser-manager")
@@ -1068,6 +1036,58 @@ func (ui *navigatorTUI) openSuperuserManagerModal() {
 	ui.modalOpen = true
 	ui.pages.AddPage("superuser-manager", center(80, 14, form), true, true)
 	ui.app.SetFocus(form)
+}
+
+func (ui *navigatorTUI) saveDBManager(manager dbManagerState, alias, baseURL string) {
+	ui.closeModal("db-manager")
+	if err := manager.save(ui.dispatcher, alias, baseURL); err != nil {
+		ui.showError(err)
+		return
+	}
+
+	ui.reloadAfterLocalConfigChange("db aliases updated")
+}
+
+func (ui *navigatorTUI) deleteDBManager(manager dbManagerState) {
+	status := dbDeleteStatus(ui.target.DB.Alias, manager.selectedAlias)
+	ui.closeModal("db-manager")
+	if err := manager.remove(ui.dispatcher); err != nil {
+		ui.showError(err)
+		return
+	}
+
+	ui.reloadAfterLocalConfigChange(status)
+}
+
+func (ui *navigatorTUI) saveSuperuserManager(manager superuserManagerState, alias, email, password string) {
+	ui.closeModal("superuser-manager")
+	if err := manager.save(ui.dispatcher, alias, email, password); err != nil {
+		ui.showError(err)
+		return
+	}
+
+	ui.reloadAfterLocalConfigChange("superusers updated")
+}
+
+func (ui *navigatorTUI) deleteSuperuserManager(manager superuserManagerState) {
+	status := superuserDeleteStatus(ui.target, manager.selectedDB, manager.selectedAlias)
+	ui.closeModal("superuser-manager")
+	if err := manager.remove(ui.dispatcher); err != nil {
+		ui.showError(err)
+		return
+	}
+
+	ui.reloadAfterLocalConfigChange(status)
+}
+
+func (ui *navigatorTUI) reloadAfterLocalConfigChange(status string) {
+	if err := ui.syncLocalConfigState(); err != nil {
+		ui.showError(err)
+		return
+	}
+
+	ui.statusMessage = status
+	ui.renderCurrentScreen()
 }
 
 func (ui *navigatorTUI) closeModal(name string) {
@@ -1168,6 +1188,32 @@ func (ui *navigatorTUI) resetToDBList() {
 	ui.totalPages = 0
 	ui.selectedIndex = 0
 	ui.columnOffset = 0
+}
+
+func applyDBFormSelection(manager *dbManagerState, aliasField, baseURLField *tview.InputField, value string) {
+	db, ok := manager.selectAlias(value)
+	if !ok {
+		aliasField.SetText("")
+		baseURLField.SetText("")
+		return
+	}
+
+	aliasField.SetText(db.Alias)
+	baseURLField.SetText(db.BaseURL)
+}
+
+func applySuperuserFormSelection(manager *superuserManagerState, aliasField, emailField, passwordField *tview.InputField, value string) {
+	su, ok := manager.selectAlias(value)
+	if !ok {
+		aliasField.SetText("")
+		emailField.SetText("")
+		passwordField.SetText("")
+		return
+	}
+
+	aliasField.SetText(su.Alias)
+	emailField.SetText(su.Email)
+	passwordField.SetText("")
 }
 
 func center(width, height int, primitive tview.Primitive) tview.Primitive {

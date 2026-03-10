@@ -130,6 +130,115 @@ func TestNavigatorTUISetupViewsCapturesTableShortcuts(t *testing.T) {
 	assert.False(t, ui.detailVisible)
 }
 
+func TestDBManagerStateSelectAlias(t *testing.T) {
+	manager := newDBManagerState([]storage.DB{
+		{Alias: "dev", BaseURL: "http://127.0.0.1:8090"},
+	})
+
+	db, ok := manager.selectAlias("dev")
+	require.True(t, ok)
+	assert.Equal(t, "dev", manager.selectedAlias)
+	assert.Equal(t, "http://127.0.0.1:8090", db.BaseURL)
+
+	_, ok = manager.selectAlias(managerNewOption)
+	require.False(t, ok)
+	assert.Empty(t, manager.selectedAlias)
+}
+
+func TestDBManagerStateSaveAndRemove(t *testing.T) {
+	dispatcher := NewDispatcher(DispatcherConfig{Stdout: bytes.NewBuffer(nil), Version: "test", DataDir: t.TempDir()})
+
+	manager := dbManagerState{}
+	require.NoError(t, manager.save(dispatcher, "dev", "http://127.0.0.1:8090"))
+
+	saved, found, err := dispatcher.dbStore.Find("dev")
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.Equal(t, "http://127.0.0.1:8090", saved.BaseURL)
+
+	manager.selectedAlias = "dev"
+	require.NoError(t, manager.save(dispatcher, "local", "http://127.0.0.1:8091"))
+
+	_, found, err = dispatcher.dbStore.Find("dev")
+	require.NoError(t, err)
+	assert.False(t, found)
+
+	updated, found, err := dispatcher.dbStore.Find("local")
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.Equal(t, "http://127.0.0.1:8091", updated.BaseURL)
+
+	manager.selectedAlias = "local"
+	require.NoError(t, manager.remove(dispatcher))
+
+	_, found, err = dispatcher.dbStore.Find("local")
+	require.NoError(t, err)
+	assert.False(t, found)
+}
+
+func TestDBManagerStateRemoveRequiresSelection(t *testing.T) {
+	err := (dbManagerState{}).remove(NewDispatcher(DispatcherConfig{Stdout: bytes.NewBuffer(nil), Version: "test", DataDir: t.TempDir()}))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Select an existing db alias first")
+}
+
+func TestSuperuserManagerStateSelectAlias(t *testing.T) {
+	manager := superuserManagerState{
+		selectedDB: "dev",
+		superusers: []storage.Superuser{
+			{DBAlias: "dev", Alias: "root", Email: "root@example.com"},
+		},
+	}
+
+	su, ok := manager.selectAlias("root")
+	require.True(t, ok)
+	assert.Equal(t, "root", manager.selectedAlias)
+	assert.Equal(t, "root@example.com", su.Email)
+
+	_, ok = manager.selectAlias(managerNewOption)
+	require.False(t, ok)
+	assert.Empty(t, manager.selectedAlias)
+}
+
+func TestSuperuserManagerStateSaveAndRemove(t *testing.T) {
+	dispatcher := NewDispatcher(DispatcherConfig{Stdout: bytes.NewBuffer(nil), Version: "test", DataDir: t.TempDir()})
+	_, err := dispatcher.saveDBAlias("dev", "http://127.0.0.1:8090")
+	require.NoError(t, err)
+
+	manager := superuserManagerState{selectedDB: "dev"}
+	require.NoError(t, manager.save(dispatcher, "root", "root@example.com", "secret"))
+
+	saved, found, err := dispatcher.suStore.Find("dev", "root")
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.Equal(t, "root@example.com", saved.Email)
+
+	manager.selectedAlias = "root"
+	require.NoError(t, manager.save(dispatcher, "ops", "ops@example.com", ""))
+
+	_, found, err = dispatcher.suStore.Find("dev", "root")
+	require.NoError(t, err)
+	assert.False(t, found)
+
+	updated, found, err := dispatcher.suStore.Find("dev", "ops")
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.Equal(t, "ops@example.com", updated.Email)
+
+	manager.selectedAlias = "ops"
+	require.NoError(t, manager.remove(dispatcher))
+
+	_, found, err = dispatcher.suStore.Find("dev", "ops")
+	require.NoError(t, err)
+	assert.False(t, found)
+}
+
+func TestSuperuserManagerStateRemoveRequiresSelection(t *testing.T) {
+	err := (superuserManagerState{selectedDB: "dev"}).remove(NewDispatcher(DispatcherConfig{Stdout: bytes.NewBuffer(nil), Version: "test", DataDir: t.TempDir()}))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Select an existing superuser first")
+}
+
 func queryResultWithColumns(count int) pocketbaseQueryResult {
 	rows := []map[string]any{rowWithColumns(count)}
 	return pocketbase.QueryResult{Rows: rows}
