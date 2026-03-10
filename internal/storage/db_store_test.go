@@ -1,6 +1,11 @@
 package storage
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
 
 func TestDBStoreAddFindListRemove(t *testing.T) {
 	store := NewDBStore(t.TempDir())
@@ -62,4 +67,16 @@ func TestDBStoreValidation(t *testing.T) {
 	if err := store.Remove("missing"); err == nil {
 		t.Fatalf("expected remove missing validation error")
 	}
+}
+
+func TestDBStoreUpdate(t *testing.T) {
+	store := NewDBStore(t.TempDir())
+	require.NoError(t, store.Add("dev", "http://127.0.0.1:8090"))
+
+	require.NoError(t, store.Update("dev", "prod", "https://pb.example.com"))
+
+	updated, found, err := store.Find("prod")
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.Equal(t, "https://pb.example.com", updated.BaseURL)
 }

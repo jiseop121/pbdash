@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.1] - 2026-03-10
+
+### Added
+- Added in-TUI local configuration management for saved `db` aliases and `superuser` aliases from the records view.
+
+### Changed
+- Refactored records TUI and local store command flows around a primary-flow-first structure.
+- Fixed full-screen records TUI shortcut handling so `q`, `j/k`, `Enter`, `r`, and related keys are captured reliably from the focused view.
+- Made db alias removal also clear locally saved superusers for that db and keep context/cache references in sync on rename/delete.
+
 ## [0.4.0] - 2026-03-09
 
 ### Changed

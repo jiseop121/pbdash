@@ -6,6 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSuperuserStoreEncryptsPasswordAtRest(t *testing.T) {
@@ -113,4 +116,29 @@ func TestSuperuserStoreRejectsInvalidEnvKey(t *testing.T) {
 	if !strings.Contains(err.Error(), "PBDASH_SUPERUSER_KEY_B64") {
 		t.Fatalf("missing env key context: %v", err)
 	}
+}
+
+func TestSuperuserStoreUpdateKeepsExistingPasswordWhenBlank(t *testing.T) {
+	store := NewSuperuserStore(t.TempDir())
+	require.NoError(t, store.Add("dev", "root", "root@example.com", "secret"))
+
+	require.NoError(t, store.Update("dev", "root", "admin", "admin@example.com", ""))
+
+	updated, found, err := store.Find("dev", "admin")
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.Equal(t, "admin@example.com", updated.Email)
+	assert.Equal(t, "secret", updated.Password)
+}
+
+func TestSuperuserStoreReassignDBAlias(t *testing.T) {
+	store := NewSuperuserStore(t.TempDir())
+	require.NoError(t, store.Add("dev", "root", "root@example.com", "secret"))
+
+	require.NoError(t, store.ReassignDBAlias("dev", "prod"))
+
+	updated, found, err := store.Find("prod", "root")
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.Equal(t, "prod", updated.DBAlias)
 }

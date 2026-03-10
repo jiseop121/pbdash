@@ -120,6 +120,99 @@ func (s *SuperuserStore) Remove(dbAlias, alias string) error {
 	return s.writeAll(filtered)
 }
 
+func (s *SuperuserStore) Update(dbAlias, currentAlias, nextAlias, email, password string) error {
+	if strings.TrimSpace(dbAlias) == "" || strings.TrimSpace(currentAlias) == "" || strings.TrimSpace(nextAlias) == "" || strings.TrimSpace(email) == "" {
+		return NewValidationError("--db, current alias, alias, and --email are required")
+	}
+
+	items, err := s.readAll()
+	if err != nil {
+		return err
+	}
+
+	target := -1
+	for i, it := range items {
+		if strings.EqualFold(it.DBAlias, dbAlias) && strings.EqualFold(it.Alias, currentAlias) {
+			target = i
+			continue
+		}
+		if strings.EqualFold(it.DBAlias, dbAlias) && strings.EqualFold(it.Alias, nextAlias) {
+			return NewValidationError(fmt.Sprintf("superuser alias %q already exists for db %q", nextAlias, dbAlias))
+		}
+	}
+	if target < 0 {
+		return NewValidationError(fmt.Sprintf("superuser alias %q is not configured for db %q", currentAlias, dbAlias))
+	}
+
+	if strings.TrimSpace(password) == "" {
+		password = items[target].Password
+	}
+	items[target] = Superuser{
+		DBAlias:  dbAlias,
+		Alias:    nextAlias,
+		Email:    email,
+		Password: password,
+	}
+	return s.writeAll(items)
+}
+
+func (s *SuperuserStore) RemoveByDB(dbAlias string) error {
+	items, err := s.readAll()
+	if err != nil {
+		return err
+	}
+
+	filtered := make([]Superuser, 0, len(items))
+	removed := false
+	for _, it := range items {
+		if strings.EqualFold(it.DBAlias, dbAlias) {
+			removed = true
+			continue
+		}
+		filtered = append(filtered, it)
+	}
+	if !removed {
+		return nil
+	}
+	return s.writeAll(filtered)
+}
+
+func (s *SuperuserStore) ReassignDBAlias(currentAlias, nextAlias string) error {
+	if strings.TrimSpace(currentAlias) == "" || strings.TrimSpace(nextAlias) == "" {
+		return NewValidationError("current db alias and next db alias are required")
+	}
+
+	items, err := s.readAll()
+	if err != nil {
+		return err
+	}
+
+	seen := map[string]struct{}{}
+	updated := false
+	for _, it := range items {
+		dbAlias := it.DBAlias
+		if strings.EqualFold(dbAlias, currentAlias) {
+			dbAlias = nextAlias
+			updated = true
+		}
+		key := strings.ToLower(strings.TrimSpace(dbAlias) + "\x00" + strings.TrimSpace(it.Alias))
+		if _, ok := seen[key]; ok {
+			return NewValidationError(fmt.Sprintf("superuser alias %q already exists for db %q", it.Alias, nextAlias))
+		}
+		seen[key] = struct{}{}
+	}
+	if !updated {
+		return nil
+	}
+
+	for i := range items {
+		if strings.EqualFold(items[i].DBAlias, currentAlias) {
+			items[i].DBAlias = nextAlias
+		}
+	}
+	return s.writeAll(items)
+}
+
 func (s *SuperuserStore) Find(dbAlias, alias string) (Superuser, bool, error) {
 	items, err := s.readAll()
 	if err != nil {
