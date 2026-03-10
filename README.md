@@ -90,23 +90,23 @@ pbdash -c "api records --db local --superuser root --collection posts --format c
 태그를 푸시하면 GitHub Release 본문은 자동 생성된다.
 
 ```bash
-make release-tag VERSION=0.4.1
+make release-tag VERSION=0.4.2
 ```
 
 동작:
 - `go test ./...` 실행
-- `v0.4.1` 태그 생성 및 원격 푸시
+- `v0.4.2` 태그 생성 및 원격 푸시
 - GitHub Actions(`.github/workflows/release.yml`)가 Release를 생성/갱신하고 변경사항 노트를 자동 작성
 
 Homebrew 배포 파일(아티팩트 + Formula) 갱신:
 
 ```bash
-make release-brew VERSION=0.4.1
+make release-brew VERSION=0.4.2
 ```
 
 동작:
 - `darwin-arm64`, `darwin-amd64` 바이너리 tar.gz 빌드
-- 현재 레포 Release(`v0.4.1`)에 아티팩트 업로드
+- 현재 레포 Release(`v0.4.2`)에 아티팩트 업로드
 - `Formula/pbdash.rb` SHA/URL 갱신 후 커밋/푸시
 - Homebrew 설치 스모크 테스트
 
