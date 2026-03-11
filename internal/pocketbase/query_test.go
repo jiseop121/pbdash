@@ -51,3 +51,27 @@ func TestCollectColumnsPriorityOrdering(t *testing.T) {
 		}
 	}
 }
+
+func TestParseItemsResultSupportsRecordsField(t *testing.T) {
+	result := ParseItemsResult(map[string]any{
+		"records": []any{
+			map[string]any{"id": "1", "title": "hello"},
+			"skip-me",
+			map[string]any{"id": "2"},
+		},
+		"page":       float64(2),
+		"perPage":    float64(50),
+		"totalItems": float64(2),
+		"totalPages": float64(1),
+	})
+
+	if len(result.Rows) != 2 {
+		t.Fatalf("row count mismatch: got=%d want=2 (%v)", len(result.Rows), result.Rows)
+	}
+	if result.Rows[0]["id"] != "1" || result.Rows[1]["id"] != "2" {
+		t.Fatalf("unexpected rows extracted: %v", result.Rows)
+	}
+	if result.Meta == nil || result.Meta.Page != 2 || result.Meta.PerPage != 50 || result.Meta.TotalItems != 2 || result.Meta.TotalPages != 1 {
+		t.Fatalf("unexpected metadata: %+v", result.Meta)
+	}
+}

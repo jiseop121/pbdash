@@ -66,23 +66,11 @@ func extractRows(payload map[string]any) []map[string]any {
 	}
 
 	if items, ok := payload["items"].([]any); ok {
-		rows := make([]map[string]any, 0, len(items))
-		for _, item := range items {
-			if row, ok := item.(map[string]any); ok {
-				rows = append(rows, row)
-			}
-		}
-		return rows
+		return extractRowsList(items)
 	}
 
 	if records, ok := payload["records"].([]any); ok {
-		rows := make([]map[string]any, 0, len(records))
-		for _, item := range records {
-			if row, ok := item.(map[string]any); ok {
-				rows = append(rows, row)
-			}
-		}
-		return rows
+		return extractRowsList(records)
 	}
 
 	if len(payload) == 0 {
@@ -90,6 +78,16 @@ func extractRows(payload map[string]any) []map[string]any {
 	}
 
 	return []map[string]any{payload}
+}
+
+func extractRowsList(items []any) []map[string]any {
+	rows := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		if row, ok := item.(map[string]any); ok {
+			rows = append(rows, row)
+		}
+	}
+	return rows
 }
 
 func extractMeta(payload map[string]any) *PageMeta {

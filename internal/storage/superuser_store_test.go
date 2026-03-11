@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -116,6 +117,22 @@ func TestSuperuserStoreRejectsInvalidEnvKey(t *testing.T) {
 	if !strings.Contains(err.Error(), "PBDASH_SUPERUSER_KEY_B64") {
 		t.Fatalf("missing env key context: %v", err)
 	}
+}
+
+func TestSuperuserStoreRejectsPermissiveKeyFile(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("permission bits are not portable on windows")
+	}
+
+	dir := t.TempDir()
+	key := base64.StdEncoding.EncodeToString([]byte(strings.Repeat("k", 32))) + "\n"
+	keyPath := filepath.Join(dir, "superusers.key")
+	require.NoError(t, os.WriteFile(keyPath, []byte(key), 0o644))
+
+	store := NewSuperuserStore(dir)
+	err := store.Add("dev", "root", "root@example.com", "pw123456")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "must not be readable by group or others")
 }
 
 func TestSuperuserStoreUpdateKeepsExistingPasswordWhenBlank(t *testing.T) {

@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 )
@@ -75,7 +76,7 @@ func (s *SuperuserStore) ListByDB(dbAlias string) ([]Superuser, error) {
 	if err != nil {
 		return nil, err
 	}
-	filtered := make([]Superuser, 0)
+	filtered := make([]Superuser, 0, len(items))
 	for _, it := range items {
 		if strings.EqualFold(it.DBAlias, dbAlias) {
 			filtered = append(filtered, it)
@@ -326,7 +327,11 @@ func (s *SuperuserStore) loadOrCreateKey() ([]byte, error) {
 		return key, nil
 	}
 
-	if data, err := os.ReadFile(s.keyPath); err == nil {
+	if err := validatePrivateKeyFile(s.keyPath); err == nil {
+		data, err := os.ReadFile(s.keyPath)
+		if err != nil {
+			return nil, err
+		}
 		key, decErr := decodeStoredKey(string(data))
 		if decErr != nil {
 			return nil, fmt.Errorf("invalid superuser key file: %w", decErr)
@@ -349,6 +354,17 @@ func (s *SuperuserStore) loadOrCreateKey() ([]byte, error) {
 		return nil, err
 	}
 	return key, nil
+}
+
+func validatePrivateKeyFile(path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0 {
+		return fmt.Errorf("superuser key file must not be readable by group or others")
+	}
+	return nil
 }
 
 func decodeStoredKey(raw string) ([]byte, error) {
