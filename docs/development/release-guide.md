@@ -59,6 +59,41 @@ make release-brew VERSION=0.4.1
 - `pbdash-v<x.y.z>-darwin-arm64.tar.gz`
 - `pbdash-v<x.y.z>-darwin-amd64.tar.gz`
 
+## 릴리즈 노트 가이드
+
+기본값은 GitHub auto-generated release notes를 사용한다.
+
+- 태그가 푸시되면 [`.github/workflows/release.yml`](/Users/hjs/Personal/multi-pocketbase-ui/.github/workflows/release.yml)이 Release를 생성하거나 갱신한다.
+- 별도 수동 릴리즈 노트 작성이나 덮어쓰기는 사용자가 명시적으로 요청한 경우에만 한다.
+- 수동 릴리즈 노트가 필요하면 태그 생성과 brew 배포 확인 이후에 진행한다.
+
+수동 작성 시 확인할 기준:
+
+- merged PR과 커밋 목록을 먼저 확인한다.
+- 사용자에게 보이는 변경을 우선 정리한다.
+- 설치, 배포, Formula, 아티팩트 변경이 있으면 별도로 적는다.
+- breaking change가 있으면 가장 먼저 명시한다.
+
+현재 공개 릴리스 기준 권장 구성:
+
+- `What's Changed` 제목 아래에 섹션을 둔다.
+- `Added`: 새 기능, 새 옵션, 새 사용자 흐름
+- `Changed`: 동작 변경, 리팩터링, 버그 수정, 설치/배포 변경
+- `Breaking`: 호환성 깨짐, 명령/환경변수/경로 변경이 있을 때만 추가한다.
+
+최근 실제 릴리스 예시:
+
+- `v0.4.2`: `Added`, `Changed`
+- `v0.4.1`: `Added`, `Changed`
+- `v0.4.0`: `Changed`, `Breaking`
+
+작성 원칙:
+
+- 실제로 릴리스에 포함된 변경만 적는다.
+- 내부 구현 세부사항보다 사용자 영향과 업그레이드 포인트를 우선한다.
+- auto-generated notes로 충분하면 추가 설명 없이 그대로 둔다.
+- 수동 보완이 필요하면 기존 auto notes를 완전히 대체하기보다 필요한 설명만 최소 범위로 추가한다.
+
 ## 실행 순서
 
 1. `git status --short`로 워킹 트리가 clean 상태인지 확인한다.
