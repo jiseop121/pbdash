@@ -46,7 +46,8 @@ go test ./...
 
 사전 조건:
 - 기본값으로 `make e2e`는 PocketBase CLI가 없으면 `.tmp/tools/pocketbase/<version>/pocketbase`에 자동 다운로드한다.
-- 이미 설치된 다른 바이너리를 쓰려면 `POCKETBASE_BIN` 환경변수로 지정한다.
+- 자동 다운로드한 zip은 PocketBase release의 `checksums.txt`와 대조해 SHA-256 검증 후에만 사용한다.
+- 이미 설치된 다른 바이너리를 쓰려면 `POCKETBASE_BIN` 환경변수로 지정한다. 절대/상대 경로뿐 아니라 PATH에 있는 명령 이름도 사용할 수 있다.
 
 실행:
 
