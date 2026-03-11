@@ -7,7 +7,6 @@ require (
 	github.com/gdamore/tcell/v2 v2.13.8
 	github.com/mrchypark/pocketbase-client v0.3.9
 	github.com/rivo/tview v0.42.0
-	github.com/stretchr/testify v1.10.0
 	golang.org/x/term v0.40.0
 )
 
@@ -21,6 +20,7 @@ require (
 	github.com/pocketbase/pocketbase v0.28.4 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/spf13/cast v1.9.2 // indirect
+	github.com/stretchr/testify v1.10.0 // indirect
 	github.com/tmaxmax/go-sse v0.11.0 // indirect
 	golang.org/x/sync v0.18.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
