@@ -6,7 +6,7 @@
 
 ## 1) Intent
 
-Track 1 범위에서 `pbdash`의 성공 경로(REPL / one-shot / script)를 한 번에 읽히게 구현하고, 실패를 일관된 오류 형식과 종료 코드(`0/1/2/3`)로 고정한다.
+Track 1 범위에서 `pbdash`의 성공 경로(TUI / REPL / one-shot / script)를 한 번에 읽히게 구현하고, 실패를 일관된 오류 형식과 종료 코드(`0/1/2/3`)로 고정한다.
 
 ## 2) Primary Flow
 
@@ -14,24 +14,30 @@ Track 1 범위에서 `pbdash`의 성공 경로(REPL / one-shot / script)를 한 
 
 1. `argv`를 파싱해 `RunConfig`를 만든다.
 2. 모드/플래그 충돌을 검증한다.
-3. 실행 모드(`repl|one-shot|script|ui-reserved`)를 결정한다.
+3. 실행 모드(`tui|repl|one-shot|script|ui-reserved`)를 결정한다.
 4. 모드 실행기 1개만 호출한다.
 5. 결과를 `stdout/stderr` 및 종료 코드로 매핑해 종료한다.
 
 ### 2.2 모드별 성공/실패 흐름
 
-#### A. REPL (`pbdash`)
+#### A. TUI (`pbdash`)
+1. 전면 TUI를 시작한다.
+2. DB 목록부터 탐색 흐름을 연다.
+3. 필요 시 superuser, collection, records 화면으로 이동한다.
+4. 종료 전까지 탐색 상태를 유지한다.
+
+#### B. REPL (`pbdash -repl`)
 1. REPL 루프를 시작한다.
 2. 입력 한 줄을 `Command`로 파싱한다.
 3. dispatcher로 명령 실행 후 결과를 출력한다.
 4. `exit`/EOF 전까지 반복한다.
 
-#### B. One-shot (`pbdash -c "<command>"`)
+#### C. One-shot (`pbdash -c "<command>"`)
 1. `-c` 텍스트를 단일 명령으로 파싱한다.
 2. dispatcher로 1회 실행한다.
 3. 결과 출력 후 종료한다.
 
-#### C. Script (`pbdash <script-file>`)
+#### D. Script (`pbdash <script-file>`)
 1. UTF-8 파일을 읽고 줄 단위로 순회한다.
 2. 빈 줄/`#` 주석 줄은 건너뛴다.
 3. 명령 실행 오류가 발생해도 다음 줄 실행을 계속한다(continue-on-error).
@@ -39,10 +45,10 @@ Track 1 범위에서 `pbdash`의 성공 경로(REPL / one-shot / script)를 한 
 5. `exit`/`quit`를 만나면 그 시점에서 script 실행을 중단한다.
 6. 종료 코드는 세션에서 마지막으로 발생한 오류 코드(`1/2/3`)를 따른다. 오류가 없으면 `0`이다.
 
-#### D. UI 예약 플래그 (`pbdash -ui`) - Track 1
+#### E. UI 예약 플래그 (`pbdash -ui`) - Track 1
 1. `-ui`를 예약 플래그로 인식한다.
 2. 실제 UI 실행 없이 즉시 실패 처리한다.
-3. `stderr`에 `Error: UI mode is not available in Track 1.`를 출력한다.
+3. `stderr`에 `Error: Web UI is under development.`를 출력한다.
 4. 종료 코드 `2`로 종료한다.
 
 ## 3) Boundaries
@@ -83,7 +89,8 @@ Track 1 범위에서 `pbdash`의 성공 경로(REPL / one-shot / script)를 한 
 |---|---|---|---|
 | `parseRunConfig` | `[]string` | `RunConfig, error` | 플래그/위치 인자 파싱 |
 | `validateRunConfig` | `RunConfig` | `error` | 모드 충돌/필수 조합 검증 |
-| `resolveMode` | `RunConfig` | `ExecMode` | `repl/one-shot/script/ui-reserved` 결정 |
+| `resolveMode` | `RunConfig` | `ExecMode` | `tui/repl/one-shot/script/ui-reserved` 결정 |
+| `runTUI` | `context` | `error` | 기본 전면 TUI 실행 |
 | `runOneShot` | `context, commandText` | `error` | 단일 명령 실행 |
 | `runScript` | `context, path` | `error` | 파일 라인 실행 + continue-on-error + 마지막 오류 코드 반영 |
 | `runREPL` | `context` | `error` | 인터랙티브 명령 루프 |
@@ -103,6 +110,7 @@ Track 1 범위에서 `pbdash`의 성공 경로(REPL / one-shot / script)를 한 
 ```go
 type RunConfig struct {
     UIEnabled   bool
+    REPLEnabled bool
     CommandText string // -c
     ScriptPath  string // positional arg
     Stdout      io.Writer
@@ -113,7 +121,8 @@ type RunConfig struct {
 
 규칙:
 - `CommandText`와 `ScriptPath` 동시 존재 금지
-- `UIEnabled`와 (`CommandText` 또는 `ScriptPath`) 동시 존재 금지
+- `UIEnabled`와 (`CommandText` 또는 `ScriptPath` 또는 `REPLEnabled`) 동시 존재 금지
+- `REPLEnabled`와 (`CommandText` 또는 `ScriptPath`) 동시 존재 금지
 
 ### 6.2 ExecMode
 
@@ -121,6 +130,7 @@ type RunConfig struct {
 type ExecMode string
 
 const (
+    ModeTUI        ExecMode = "tui"
     ModeREPL       ExecMode = "repl"
     ModeOneShot    ExecMode = "one-shot"
     ModeScript     ExecMode = "script"
@@ -150,7 +160,7 @@ type AppError struct {
 
 ### 7.1 공통 규칙
 
-- 모든 실행 경로(REPL / one-shot / script)는 같은 dispatcher를 공유한다.
+- 모든 실행 경로(TUI / REPL / one-shot / script)는 같은 dispatcher를 공유한다.
 - PocketBase API는 GET만 허용한다.
 - 쓰기 동작 요청은 `ErrInvalidArgs`로 거절한다.
 
@@ -219,13 +229,16 @@ internal/storage/superuser_store.go
 ### 10.1 `parseRunConfig` / `validateRunConfig`
 
 table case 필수:
-- `[]` -> `ModeREPL`
+- `[]` -> `ModeTUI`
+- `-repl` -> `ModeREPL`
 - `-c "version"` -> `ModeOneShot`
 - `script.txt` -> `ModeScript`
 - `-ui` -> `ModeUIReserved`
 - `-c + script` -> `ErrInvalidArgs`
 - `-ui + -c` -> `ErrInvalidArgs`
 - `-ui + script` -> `ErrInvalidArgs`
+- `-repl + -c` -> `ErrInvalidArgs`
+- `-repl + script` -> `ErrInvalidArgs`
 
 ### 10.2 `runScript`
 

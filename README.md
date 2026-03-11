@@ -108,30 +108,12 @@ pbdash> api records --collection posts
 pbdash -c "api records --db local --superuser root --collection posts --format csv --out ./posts.csv"
 ```
 
-## Release 자동화
+## 개발/배포 문서
 
-태그를 푸시하면 GitHub Release 본문은 자동 생성된다.
+유지보수자용 개발 절차와 릴리스 순서는 아래 문서를 참고합니다.
 
-```bash
-make release-tag VERSION=0.4.1
-```
-
-동작:
-- `go test ./...` 실행
-- `v0.4.1` 태그 생성 및 원격 푸시
-- GitHub Actions(`.github/workflows/release.yml`)가 Release를 생성/갱신하고 변경사항 노트를 자동 작성
-
-Homebrew 배포 파일(아티팩트 + Formula) 갱신:
-
-```bash
-make release-brew VERSION=0.4.1
-```
-
-동작:
-- `darwin-arm64`, `darwin-amd64` 바이너리 tar.gz 빌드
-- 현재 레포 Release(`v0.4.1`)에 아티팩트 업로드
-- `Formula/pbdash.rb` SHA/URL 갱신 후 커밋/푸시
-- Homebrew 설치 스모크 테스트
+- `docs/development/development-guide.md`
+- `docs/development/release-guide.md`
 
 ## 참고
 

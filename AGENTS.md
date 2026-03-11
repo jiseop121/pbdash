@@ -31,7 +31,7 @@
 - 새 문서를 추가할 때는 먼저 공개 문서인지 내부 문서인지 판단한 뒤 `development`, `specs`, `internal` 중 하나에만 둡니다.
 
 ## 작업별 추천 문서
-- 릴리스, 버전 정책, brew 배포 작업: 이 문서의 릴리스 섹션과 `README.md`를 먼저 확인합니다.
+- 릴리스, 버전 정책, brew 배포 작업: 이 문서의 릴리스 섹션과 `docs/development/release-guide.md`를 먼저 확인합니다.
 - 로컬 개발, 테스트, E2E 검증: `docs/development/development-guide.md`
 - 외부 의존성 수정: `docs/development/dependencies/README.md`
 - PocketBase SDK 수정: `docs/development/dependencies/pocketbase-client.md`
@@ -45,6 +45,7 @@
 - 패키지 경계를 흐리지 않습니다.
 - 기능 변경과 무관한 정리 작업은 섞지 않습니다.
 - 새 의존성 추가는 꼭 필요할 때만 합니다.
+- 코드 수정이 발생하면 관련 문서도 항상 함께 검토하고, 필요한 업데이트를 같은 작업 범위에 반영합니다.
 - 사용자에게 보이는 동작이 바뀌면 `README.md` 반영 여부도 함께 확인합니다.
 
 ## 브랜치와 PR 원칙
@@ -101,6 +102,7 @@
 
 ## 릴리즈 노트 지침
 - GitHub Release 노트는 태그 푸시 후 GitHub Actions가 자동 생성합니다.
+- 관련 워크플로우는 `.github/workflows/release.yml` 입니다.
 - 수동으로 릴리즈 노트를 따로 작성하거나 덮어쓰는 작업은 사용자가 명시적으로 요청한 경우에만 합니다.
 - 새 버전 릴리스 시 먼저 태그를 만들고 푸시해야 합니다.
 - 표준 절차는 `make release-tag VERSION=x.y.z` 입니다.

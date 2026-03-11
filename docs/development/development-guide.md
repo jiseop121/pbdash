@@ -5,6 +5,7 @@
 ## 문서 지도
 
 - 개발 절차 문서 폴더: `docs/development`
+- 릴리스 절차: `docs/development/release-guide.md`
 - 공개 명세 문서 폴더: `docs/specs`
 - 내부 문서 폴더: `docs/internal`
 - 외부 의존성 인덱스: `docs/development/dependencies/README.md`
