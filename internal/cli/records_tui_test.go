@@ -8,6 +8,8 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/jiseop121/pbdash/internal/pocketbase"
 	"github.com/jiseop121/pbdash/internal/storage"
@@ -99,6 +101,169 @@ func TestRunRecordsTUIUsesNavigatorRunner(t *testing.T) {
 	if gotRoute.state.Collection != "posts" || gotRoute.state.Page != 2 {
 		t.Fatalf("state mismatch: %+v", gotRoute.state)
 	}
+}
+
+func TestNavigatorTUISetupViewsCapturesTableShortcuts(t *testing.T) {
+	ui := &navigatorTUI{
+		app:           tview.NewApplication(),
+		statusView:    tview.NewTextView(),
+		tableView:     tview.NewTable(),
+		detailView:    tview.NewTextView(),
+		helpView:      tview.NewTextView(),
+		screen:        screenRecords,
+		detailVisible: true,
+		observedCols:  map[string]struct{}{},
+		result: pocketbase.QueryResult{Rows: []map[string]any{
+			{"id": "1", "title": "first"},
+			{"id": "2", "title": "second"},
+		}},
+	}
+
+	ui.setupViews()
+	handler := ui.tableView.InputHandler()
+	require.NotNil(t, handler)
+
+	handler(tcell.NewEventKey(tcell.KeyRune, 'j', tcell.ModNone), func(tview.Primitive) {})
+	assert.Equal(t, 1, ui.selectedIndex)
+
+	handler(tcell.NewEventKey(tcell.KeyEnter, 0, tcell.ModNone), func(tview.Primitive) {})
+	assert.False(t, ui.detailVisible)
+}
+
+func TestDBManagerStateSelectAlias(t *testing.T) {
+	manager := newDBManagerState([]storage.DB{
+		{Alias: "dev", BaseURL: "http://127.0.0.1:8090"},
+	})
+
+	db, ok := manager.selectAlias("dev")
+	require.True(t, ok)
+	assert.Equal(t, "dev", manager.selectedAlias)
+	assert.Equal(t, "http://127.0.0.1:8090", db.BaseURL)
+
+	_, ok = manager.selectAlias(managerNewOption)
+	require.False(t, ok)
+	assert.Empty(t, manager.selectedAlias)
+}
+
+func TestDBManagerStateSaveAndRemove(t *testing.T) {
+	dispatcher := NewDispatcher(DispatcherConfig{Stdout: bytes.NewBuffer(nil), Version: "test", DataDir: t.TempDir()})
+
+	manager := dbManagerState{}
+	require.NoError(t, manager.save(dispatcher, "dev", "http://127.0.0.1:8090"))
+
+	saved, found, err := dispatcher.dbStore.Find("dev")
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.Equal(t, "http://127.0.0.1:8090", saved.BaseURL)
+
+	manager.selectedAlias = "dev"
+	require.NoError(t, manager.save(dispatcher, "local", "http://127.0.0.1:8091"))
+
+	_, found, err = dispatcher.dbStore.Find("dev")
+	require.NoError(t, err)
+	assert.False(t, found)
+
+	updated, found, err := dispatcher.dbStore.Find("local")
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.Equal(t, "http://127.0.0.1:8091", updated.BaseURL)
+
+	manager.selectedAlias = "local"
+	require.NoError(t, manager.remove(dispatcher))
+
+	_, found, err = dispatcher.dbStore.Find("local")
+	require.NoError(t, err)
+	assert.False(t, found)
+}
+
+func TestDBManagerStateRemoveRequiresSelection(t *testing.T) {
+	err := (dbManagerState{}).remove(NewDispatcher(DispatcherConfig{Stdout: bytes.NewBuffer(nil), Version: "test", DataDir: t.TempDir()}))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Select an existing db alias first")
+}
+
+func TestSuperuserManagerStateSelectAlias(t *testing.T) {
+	manager := superuserManagerState{
+		selectedDB: "dev",
+		superusers: []storage.Superuser{
+			{DBAlias: "dev", Alias: "root", Email: "root@example.com"},
+		},
+	}
+
+	su, ok := manager.selectAlias("root")
+	require.True(t, ok)
+	assert.Equal(t, "root", manager.selectedAlias)
+	assert.Equal(t, "root@example.com", su.Email)
+
+	_, ok = manager.selectAlias(managerNewOption)
+	require.False(t, ok)
+	assert.Empty(t, manager.selectedAlias)
+}
+
+func TestNewSuperuserManagerStateFallsBackToFirstDB(t *testing.T) {
+	manager := newSuperuserManagerState([]storage.DB{
+		{Alias: "dev", BaseURL: "http://127.0.0.1:8090"},
+		{Alias: "prod", BaseURL: "https://pb.example.com"},
+	}, "")
+
+	assert.Equal(t, "dev", manager.selectedDB)
+	assert.Equal(t, 0, manager.selectedDBIndex())
+}
+
+func TestNavigatorTUIRetargetAliasesAfterRename(t *testing.T) {
+	ui := &navigatorTUI{
+		hasTarget: true,
+		target: pbTarget{
+			DB: storage.DB{Alias: "dev", BaseURL: "http://127.0.0.1:8090"},
+			SU: storage.Superuser{DBAlias: "dev", Alias: "root", Email: "root@example.com"},
+		},
+	}
+
+	ui.retargetDBAlias("dev", "prod")
+	assert.Equal(t, "prod", ui.target.DB.Alias)
+	assert.Equal(t, "prod", ui.target.SU.DBAlias)
+
+	ui.retargetSuperuserAlias("prod", "root", "admin")
+	assert.Equal(t, "admin", ui.target.SU.Alias)
+}
+
+func TestSuperuserManagerStateSaveAndRemove(t *testing.T) {
+	dispatcher := NewDispatcher(DispatcherConfig{Stdout: bytes.NewBuffer(nil), Version: "test", DataDir: t.TempDir()})
+	_, err := dispatcher.saveDBAlias("dev", "http://127.0.0.1:8090")
+	require.NoError(t, err)
+
+	manager := superuserManagerState{selectedDB: "dev"}
+	require.NoError(t, manager.save(dispatcher, "root", "root@example.com", "secret"))
+
+	saved, found, err := dispatcher.suStore.Find("dev", "root")
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.Equal(t, "root@example.com", saved.Email)
+
+	manager.selectedAlias = "root"
+	require.NoError(t, manager.save(dispatcher, "ops", "ops@example.com", ""))
+
+	_, found, err = dispatcher.suStore.Find("dev", "root")
+	require.NoError(t, err)
+	assert.False(t, found)
+
+	updated, found, err := dispatcher.suStore.Find("dev", "ops")
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.Equal(t, "ops@example.com", updated.Email)
+
+	manager.selectedAlias = "ops"
+	require.NoError(t, manager.remove(dispatcher))
+
+	_, found, err = dispatcher.suStore.Find("dev", "ops")
+	require.NoError(t, err)
+	assert.False(t, found)
+}
+
+func TestSuperuserManagerStateRemoveRequiresSelection(t *testing.T) {
+	err := (superuserManagerState{selectedDB: "dev"}).remove(NewDispatcher(DispatcherConfig{Stdout: bytes.NewBuffer(nil), Version: "test", DataDir: t.TempDir()}))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Select an existing superuser first")
 }
 
 func queryResultWithColumns(count int) pocketbaseQueryResult {

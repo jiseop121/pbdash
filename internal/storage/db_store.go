@@ -45,6 +45,40 @@ func (s *DBStore) Add(alias, baseURL string) error {
 	return s.writeAll(items)
 }
 
+func (s *DBStore) Update(currentAlias, nextAlias, baseURL string) error {
+	if strings.TrimSpace(currentAlias) == "" {
+		return NewValidationError("current db alias is required")
+	}
+	if strings.TrimSpace(nextAlias) == "" {
+		return NewValidationError("db alias is required")
+	}
+	if err := validateBaseURL(baseURL); err != nil {
+		return err
+	}
+
+	items, err := s.readAll()
+	if err != nil {
+		return err
+	}
+
+	target := -1
+	for i, it := range items {
+		if strings.EqualFold(it.Alias, currentAlias) {
+			target = i
+			continue
+		}
+		if strings.EqualFold(it.Alias, nextAlias) {
+			return NewValidationError(fmt.Sprintf("db alias %q already exists", nextAlias))
+		}
+	}
+	if target < 0 {
+		return NewValidationError(fmt.Sprintf("db alias %q was not found", currentAlias))
+	}
+
+	items[target] = DB{Alias: nextAlias, BaseURL: baseURL}
+	return s.writeAll(items)
+}
+
 func (s *DBStore) List() ([]DB, error) {
 	items, err := s.readAll()
 	if err != nil {
@@ -76,6 +110,12 @@ func (s *DBStore) Remove(alias string) error {
 	}
 
 	return s.writeAll(filtered)
+}
+
+func (s *DBStore) ReplaceAll(items []DB) error {
+	cloned := make([]DB, len(items))
+	copy(cloned, items)
+	return s.writeAll(cloned)
 }
 
 func (s *DBStore) Find(alias string) (DB, bool, error) {
