@@ -74,7 +74,7 @@ e2e: pocketbase-bin
 
 pocketbase-superuser: pocketbase-bin
 	mkdir -p $(PB_WORKDIR)
-	cd $(PB_WORKDIR) && ($(POCKETBASE_BIN) superuser create $(PB_SUPERUSER_EMAIL) $(PB_SUPERUSER_PASSWORD) || $(POCKETBASE_BIN) superuser upsert $(PB_SUPERUSER_EMAIL) $(PB_SUPERUSER_PASSWORD))
+	cd $(PB_WORKDIR) && ($(POCKETBASE_BIN) superuser upsert $(PB_SUPERUSER_EMAIL) $(PB_SUPERUSER_PASSWORD) || $(POCKETBASE_BIN) superuser create $(PB_SUPERUSER_EMAIL) $(PB_SUPERUSER_PASSWORD))
 
 pocketbase-serve: pocketbase-bin
 	mkdir -p $(PB_WORKDIR)
