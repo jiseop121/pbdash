@@ -200,6 +200,33 @@ func TestSuperuserManagerStateSelectAlias(t *testing.T) {
 	assert.Empty(t, manager.selectedAlias)
 }
 
+func TestNewSuperuserManagerStateFallsBackToFirstDB(t *testing.T) {
+	manager := newSuperuserManagerState([]storage.DB{
+		{Alias: "dev", BaseURL: "http://127.0.0.1:8090"},
+		{Alias: "prod", BaseURL: "https://pb.example.com"},
+	}, "")
+
+	assert.Equal(t, "dev", manager.selectedDB)
+	assert.Equal(t, 0, manager.selectedDBIndex())
+}
+
+func TestNavigatorTUIRetargetAliasesAfterRename(t *testing.T) {
+	ui := &navigatorTUI{
+		hasTarget: true,
+		target: pbTarget{
+			DB: storage.DB{Alias: "dev", BaseURL: "http://127.0.0.1:8090"},
+			SU: storage.Superuser{DBAlias: "dev", Alias: "root", Email: "root@example.com"},
+		},
+	}
+
+	ui.retargetDBAlias("dev", "prod")
+	assert.Equal(t, "prod", ui.target.DB.Alias)
+	assert.Equal(t, "prod", ui.target.SU.DBAlias)
+
+	ui.retargetSuperuserAlias("prod", "root", "admin")
+	assert.Equal(t, "admin", ui.target.SU.Alias)
+}
+
 func TestSuperuserManagerStateSaveAndRemove(t *testing.T) {
 	dispatcher := NewDispatcher(DispatcherConfig{Stdout: bytes.NewBuffer(nil), Version: "test", DataDir: t.TempDir()})
 	_, err := dispatcher.saveDBAlias("dev", "http://127.0.0.1:8090")

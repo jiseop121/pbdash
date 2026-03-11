@@ -1039,12 +1039,14 @@ func (ui *navigatorTUI) openSuperuserManagerModal() {
 }
 
 func (ui *navigatorTUI) saveDBManager(manager dbManagerState, alias, baseURL string) {
+	previousAlias := manager.selectedAlias
 	ui.closeModal("db-manager")
 	if err := manager.save(ui.dispatcher, alias, baseURL); err != nil {
 		ui.showError(err)
 		return
 	}
 
+	ui.retargetDBAlias(previousAlias, alias)
 	ui.reloadAfterLocalConfigChange("db aliases updated")
 }
 
@@ -1060,12 +1062,14 @@ func (ui *navigatorTUI) deleteDBManager(manager dbManagerState) {
 }
 
 func (ui *navigatorTUI) saveSuperuserManager(manager superuserManagerState, alias, email, password string) {
+	previousAlias := manager.selectedAlias
 	ui.closeModal("superuser-manager")
 	if err := manager.save(ui.dispatcher, alias, email, password); err != nil {
 		ui.showError(err)
 		return
 	}
 
+	ui.retargetSuperuserAlias(manager.selectedDB, previousAlias, alias)
 	ui.reloadAfterLocalConfigChange("superusers updated")
 }
 
@@ -1188,6 +1192,34 @@ func (ui *navigatorTUI) resetToDBList() {
 	ui.totalPages = 0
 	ui.selectedIndex = 0
 	ui.columnOffset = 0
+}
+
+func (ui *navigatorTUI) retargetDBAlias(previousAlias, nextAlias string) {
+	if !ui.hasTarget || strings.TrimSpace(previousAlias) == "" {
+		return
+	}
+	if !strings.EqualFold(ui.target.DB.Alias, previousAlias) {
+		return
+	}
+
+	ui.target.DB.Alias = nextAlias
+	if strings.EqualFold(ui.target.SU.DBAlias, previousAlias) {
+		ui.target.SU.DBAlias = nextAlias
+	}
+}
+
+func (ui *navigatorTUI) retargetSuperuserAlias(dbAlias, previousAlias, nextAlias string) {
+	if !ui.hasTarget || strings.TrimSpace(previousAlias) == "" {
+		return
+	}
+	if !strings.EqualFold(ui.target.DB.Alias, dbAlias) {
+		return
+	}
+	if !strings.EqualFold(ui.target.SU.Alias, previousAlias) {
+		return
+	}
+
+	ui.target.SU.Alias = nextAlias
 }
 
 func applyDBFormSelection(manager *dbManagerState, aliasField, baseURLField *tview.InputField, value string) {
@@ -1321,7 +1353,11 @@ func (m *superuserManagerState) loadSuperusers(dispatcher *Dispatcher) error {
 }
 
 func (m superuserManagerState) selectedDBIndex() int {
-	return indexDBAlias(m.dbs, m.selectedDB)
+	index := indexDBAlias(m.dbs, m.selectedDB)
+	if index < 0 {
+		return 0
+	}
+	return index
 }
 
 func (m superuserManagerState) aliasChoices() []string {
@@ -1359,7 +1395,7 @@ func indexDBAlias(items []storage.DB, alias string) int {
 			return i
 		}
 	}
-	return 0
+	return -1
 }
 
 func dbDeleteStatus(currentTargetAlias, deletedAlias string) string {
