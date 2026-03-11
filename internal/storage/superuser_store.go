@@ -327,7 +327,8 @@ func (s *SuperuserStore) loadOrCreateKey() ([]byte, error) {
 		return key, nil
 	}
 
-	if err := validatePrivateKeyFile(s.keyPath); err == nil {
+	validateErr := validatePrivateKeyFile(s.keyPath)
+	if validateErr == nil {
 		data, err := os.ReadFile(s.keyPath)
 		if err != nil {
 			return nil, err
@@ -337,8 +338,9 @@ func (s *SuperuserStore) loadOrCreateKey() ([]byte, error) {
 			return nil, fmt.Errorf("invalid superuser key file: %w", decErr)
 		}
 		return key, nil
-	} else if !os.IsNotExist(err) {
-		return nil, err
+	}
+	if !os.IsNotExist(validateErr) {
+		return nil, validateErr
 	}
 
 	if err := os.MkdirAll(filepath.Dir(s.keyPath), 0o755); err != nil {

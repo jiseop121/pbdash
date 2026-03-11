@@ -121,7 +121,7 @@ func TestSuperuserStoreRejectsInvalidEnvKey(t *testing.T) {
 
 func TestSuperuserStoreRejectsPermissiveKeyFile(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("permission bits are not portable on windows")
+		t.Skip("permission bits are not portable on Windows")
 	}
 
 	dir := t.TempDir()

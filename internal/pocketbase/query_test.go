@@ -68,8 +68,19 @@ func TestParseItemsResultSupportsRecordsField(t *testing.T) {
 	if len(result.Rows) != 2 {
 		t.Fatalf("row count mismatch: got=%d want=2 (%v)", len(result.Rows), result.Rows)
 	}
-	if result.Rows[0]["id"] != "1" || result.Rows[1]["id"] != "2" {
-		t.Fatalf("unexpected rows extracted: %v", result.Rows)
+	wantIDs := map[string]struct{}{"1": {}, "2": {}}
+	for _, row := range result.Rows {
+		id, ok := row["id"].(string)
+		if !ok {
+			t.Fatalf("each extracted row should keep its string id: %v", result.Rows)
+		}
+		if _, ok := wantIDs[id]; !ok {
+			t.Fatalf("unexpected row extracted from records payload: %v", result.Rows)
+		}
+		delete(wantIDs, id)
+	}
+	if len(wantIDs) != 0 {
+		t.Fatalf("non-record items should be skipped; missing ids=%v rows=%v", wantIDs, result.Rows)
 	}
 	if result.Meta == nil || result.Meta.Page != 2 || result.Meta.PerPage != 50 || result.Meta.TotalItems != 2 || result.Meta.TotalPages != 1 {
 		t.Fatalf("unexpected metadata: %+v", result.Meta)
