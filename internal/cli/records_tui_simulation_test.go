@@ -46,13 +46,14 @@ func TestNavigatorTUISimulationRendersRecordsScreen(t *testing.T) {
 		},
 		totalItems:    2,
 		totalPages:    1,
-		detailVisible: true,
+		detailVisible: false,
 	})
 
 	h.waitForText("collection=posts", "page=1", "totalItems=2", "ID", "TITLE", "/ filter")
+	h.waitForMissing("record detail")
 }
 
-func TestNavigatorTUISimulationMovesSelectionAndUpdatesDetail(t *testing.T) {
+func TestNavigatorTUISimulationOpensSelectedRecordDetail(t *testing.T) {
 	h := newRecordsSimulationHarness(t, recordsSimulationConfig{
 		result: pocketbase.QueryResult{Rows: []map[string]any{
 			{"id": "rec-001", "title": "first-row", "detail_token": "detail-first"},
@@ -67,21 +68,21 @@ func TestNavigatorTUISimulationMovesSelectionAndUpdatesDetail(t *testing.T) {
 		target:        pbTarget{DB: storage.DB{Alias: "dev"}, SU: storage.Superuser{Alias: "root"}},
 		totalItems:    2,
 		totalPages:    1,
-		detailVisible: true,
+		detailVisible: false,
 	})
 
-	h.waitForText(`"detail_token": "detail-first"`)
-
 	h.injectRune('j')
-	h.waitForText(`"detail_token": "detail-second"`)
-	h.waitForMissing(`"detail_token": "detail-first"`)
+	h.injectKey(tcell.KeyEnter)
+	h.waitForText(`"detail_token": "detail-second"`, "y copy", "record")
+	assert.Equal(t, screenRecordDetail, h.ui.screen)
 
-	h.injectRune('k')
-	h.waitForText(`"detail_token": "detail-first"`)
+	h.injectKey(tcell.KeyEsc)
+	h.waitForText("ID", "TITLE")
 	h.waitForMissing(`"detail_token": "detail-second"`)
+	assert.Equal(t, screenRecords, h.ui.screen)
 }
 
-func TestNavigatorTUISimulationTogglesDetail(t *testing.T) {
+func TestNavigatorTUISimulationCopiesRecordDetail(t *testing.T) {
 	h := newRecordsSimulationHarness(t, recordsSimulationConfig{
 		result: pocketbase.QueryResult{Rows: []map[string]any{
 			{"id": "rec-001", "title": "first-row", "detail_token": "detail-first"},
@@ -95,18 +96,15 @@ func TestNavigatorTUISimulationTogglesDetail(t *testing.T) {
 		target:        pbTarget{DB: storage.DB{Alias: "dev"}, SU: storage.Superuser{Alias: "root"}},
 		totalItems:    1,
 		totalPages:    1,
-		detailVisible: true,
+		detailVisible: false,
 	})
 
-	h.waitForText("record detail", `"detail_token": "detail-first"`)
-
-	h.injectKey(tcell.KeyEnter)
-	h.waitForMissing("record detail", `"detail_token": "detail-first"`)
-	assert.False(t, h.ui.detailVisible)
-
 	h.injectKey(tcell.KeyEnter)
 	h.waitForText("record detail", `"detail_token": "detail-first"`)
-	assert.True(t, h.ui.detailVisible)
+
+	h.injectRune('y')
+	assert.Contains(t, string(h.screen.GetClipboardData()), `"detail_token": "detail-first"`)
+	h.waitForText("status=copied")
 }
 
 func TestNavigatorTUISimulationHorizontalScrollsColumns(t *testing.T) {
@@ -258,6 +256,7 @@ func newSimulationNavigatorTUI(cfg recordsSimulationConfig, screen tcell.Simulat
 	return &navigatorTUI{
 		app:           app,
 		stop:          app.Stop,
+		termScreen:    screen,
 		statusView:    tview.NewTextView(),
 		tableView:     tview.NewTable(),
 		detailView:    tview.NewTextView(),

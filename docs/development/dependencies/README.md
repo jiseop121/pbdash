@@ -16,7 +16,7 @@
 - 사용 위치: `internal/cli/records_tui.go`
 - 현재 사용 방식
   - `Application`, `Pages`, `Flex`, `Table`, `TextView` 중심으로 화면을 구성한다.
-  - DB 목록, superuser 선택, collection 목록, records 테이블을 한 개의 navigator 흐름으로 조합한다.
+  - DB 목록, superuser 선택, collection 목록, records 테이블, record detail 화면을 한 개의 navigator 흐름으로 조합한다.
   - 상세 패널, 상태바, 도움말 라인을 모두 `tview` primitive로 렌더링한다.
   - 폼/모달 입력은 공통 포커스 이동 규칙과 모달별 단축키(`Enter` 적용, `Esc` 취소, 컬럼 선택은 `Space` 토글)를 함께 사용한다.
 - 주의사항
@@ -31,6 +31,7 @@
 - 현재 사용 방식
   - 방향키, Enter, Esc, Backspace 등 이벤트 처리를 `tcell.EventKey` 기준으로 분기한다.
   - 선택 행 스타일과 같은 기본 TUI 색상도 `tcell.Style`로 설정한다.
+  - `record detail` 화면의 clipboard 복사는 `tcell.Screen.SetClipboard()`로 처리한다.
   - records TUI 렌더링 회귀는 `SimulationScreen` 기반 테스트에서 실제 키 주입과 화면 텍스트 일부를 검증한다.
 - 주의사항
   - 키 코드 또는 입력 처리 규칙이 바뀌면 TUI 탐색성이 바로 깨질 수 있다.

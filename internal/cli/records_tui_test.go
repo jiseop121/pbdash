@@ -115,7 +115,9 @@ func TestNavigatorTUISetupViewsCapturesTableShortcuts(t *testing.T) {
 	assert.Equal(t, 1, ui.selectedIndex)
 
 	handler(tcell.NewEventKey(tcell.KeyEnter, 0, tcell.ModNone), func(tview.Primitive) {})
-	assert.False(t, ui.detailVisible)
+	assert.Equal(t, screenRecordDetail, ui.screen)
+	require.NotNil(t, ui.recordDetail)
+	assert.Equal(t, "second", ui.recordDetail["title"])
 }
 
 func TestNavigatorTUIRenderCurrentScreenRestoresMainFocus(t *testing.T) {
@@ -147,7 +149,8 @@ func TestNavigatorTUIGlobalBackWorksOutsideTableFocus(t *testing.T) {
 	ui := newTestNavigatorTUI()
 	ui.setupViews()
 	ui.pushScreen(screenCollections)
-	ui.pushScreen(screenRecords)
+	ui.recordDetail = map[string]any{"id": "1"}
+	ui.pushScreen(screenRecordDetail)
 	ui.app.SetFocus(ui.detailView)
 
 	got := ui.handleGlobalKey(tcell.NewEventKey(tcell.KeyEsc, 0, tcell.ModNone))
@@ -231,6 +234,24 @@ func TestNavigatorTUICollectionScreenShowsNames(t *testing.T) {
 	assert.Equal(t, "posts", row["name"])
 	assert.Equal(t, "col_posts", row["id"])
 	assert.Equal(t, "base", row["type"])
+}
+
+func TestNavigatorTUICopyRecordDetailWritesClipboard(t *testing.T) {
+	screen := tcell.NewSimulationScreen("UTF-8")
+	require.NotNil(t, screen)
+
+	app := tview.NewApplication()
+	app.SetScreen(screen)
+
+	ui := newTestNavigatorTUI()
+	ui.app = app
+	ui.termScreen = screen
+	ui.screen = screenRecordDetail
+	ui.recordDetail = map[string]any{"id": "rec-001", "title": "first"}
+
+	require.True(t, ui.copyRecordDetail())
+	assert.Contains(t, string(screen.GetClipboardData()), `"id": "rec-001"`)
+	assert.Equal(t, "copied", ui.statusMessage)
 }
 
 func TestRemapFormArrowNavigationInputFieldUsesVerticalOnly(t *testing.T) {

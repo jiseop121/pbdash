@@ -60,9 +60,11 @@ pbdash -c "api records --db local --superuser root --collection posts --page 1 -
 ### 5) TUI/REPL 진입
 
 기본 실행은 전면 TUI다.
-탐색 흐름은 `DB 목록 -> (필요 시 superuser 선택) -> collections -> records table` 순서다.
+탐색 흐름은 `DB 목록 -> (필요 시 superuser 선택) -> collections -> records table -> record detail` 순서다.
 기본 탐색은 `j/k` 또는 화살표키로 이동한다.
 `q`는 종료, `Esc`/`Backspace`는 이전 화면으로 돌아간다.
+records 화면에서는 `Enter`로 별도 `record detail` 화면으로 들어간다.
+`record detail` 화면에서는 `y`로 현재 레코드 JSON을 clipboard에 복사할 수 있다.
 컬럼 선택 모달(`c`)에서는 `Space`로 컬럼을 토글하고 `Enter`로 적용, `Esc`로 취소한다.
 필터 모달(`/`)에서는 `Enter`로 적용하고 `Esc`로 취소한다.
 

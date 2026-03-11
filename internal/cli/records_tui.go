@@ -27,6 +27,7 @@ const (
 	screenSuperusers  navigatorScreen = "superusers"
 	screenCollections navigatorScreen = "collections"
 	screenRecords     navigatorScreen = "records"
+	screenRecordDetail navigatorScreen = "record-detail"
 )
 
 type navigatorRoute struct {
@@ -44,6 +45,7 @@ type navigatorTUI struct {
 	stop   func()
 	pages  *tview.Pages
 	layout *tview.Flex
+	termScreen tcell.Screen
 
 	statusView *tview.TextView
 	tableView  *tview.Table
@@ -61,6 +63,7 @@ type navigatorTUI struct {
 
 	recordsState  RecordsQueryState
 	result        pocketbase.QueryResult
+	recordDetail  map[string]any
 	totalItems    int
 	totalPages    int
 	selectedIndex int
@@ -213,6 +216,9 @@ func (ui *navigatorTUI) bootstrap(route navigatorRoute) error {
 func (ui *navigatorTUI) setupViews() {
 	ui.statusView.SetDynamicColors(true)
 	ui.app.SetInputCapture(ui.handleGlobalKey)
+	ui.app.SetAfterDrawFunc(func(screen tcell.Screen) {
+		ui.termScreen = screen
+	})
 
 	ui.tableView.SetBorders(false)
 	ui.tableView.SetSelectable(true, false)
@@ -231,6 +237,7 @@ func (ui *navigatorTUI) setupViews() {
 	ui.detailView.SetTextAlign(tview.AlignLeft)
 	ui.detailView.SetDynamicColors(true)
 	ui.detailView.SetBorder(true)
+	ui.detailView.SetInputCapture(ui.handleKey)
 
 	ui.layout = tview.NewFlex().SetDirection(tview.FlexRow)
 	ui.layout.AddItem(ui.statusView, 1, 0, false)
@@ -331,6 +338,8 @@ func (ui *navigatorTUI) consumeRuneCommand(key rune) bool {
 		return ui.openRecordsAction(ui.openSortModal)
 	case 'c':
 		return ui.openRecordsAction(ui.openColumnsModal)
+	case 'y':
+		return ui.copyRecordDetail()
 	case 'b':
 		ui.openDBManagerModal()
 		return true
@@ -403,6 +412,10 @@ func (ui *navigatorTUI) isRecordsScreen() bool {
 	return ui.screen == screenRecords
 }
 
+func (ui *navigatorTUI) isRecordDetailScreen() bool {
+	return ui.screen == screenRecordDetail
+}
+
 func (ui *navigatorTUI) handleEnter() {
 	switch ui.screen {
 	case screenDBList:
@@ -418,8 +431,31 @@ func (ui *navigatorTUI) handleEnter() {
 			ui.showError(err)
 		}
 	case screenRecords:
-		ui.toggleDetail()
+		if err := ui.activateSelectedRecordDetail(); err != nil {
+			ui.showError(err)
+		}
 	}
+}
+
+func (ui *navigatorTUI) copyRecordDetail() bool {
+	if !ui.isRecordDetailScreen() {
+		return false
+	}
+	body, err := ui.recordDetailText()
+	if err != nil {
+		ui.showError(err)
+		return true
+	}
+	if ui.termScreen == nil {
+		ui.showError(apperr.RuntimeErr("Clipboard is not available.", "Try again after the TUI finishes drawing.", nil))
+		return true
+	}
+	ui.termScreen.SetClipboard([]byte(body))
+	ui.statusMessage = "copied"
+	if ui.statusView != nil {
+		ui.statusView.SetText(ui.statusText())
+	}
+	return true
 }
 
 func (ui *navigatorTUI) goBack() {
@@ -519,12 +555,23 @@ func (ui *navigatorTUI) activateSelectedCollection() error {
 		return apperr.RuntimeErr("Could not determine collection name.", "", nil)
 	}
 	ui.recordsState = RecordsQueryState{Collection: name, Page: 1}
-	ui.detailVisible = true
+	ui.detailVisible = false
+	ui.recordDetail = nil
 	ui.observedCols = map[string]struct{}{}
 	if err := ui.fetchRecords(); err != nil {
 		return err
 	}
 	ui.pushScreen(screenRecords)
+	return nil
+}
+
+func (ui *navigatorTUI) activateSelectedRecordDetail() error {
+	row, ok := ui.selectedRecordRow()
+	if !ok {
+		return nil
+	}
+	ui.recordDetail = cloneRow(row)
+	ui.pushScreen(screenRecordDetail)
 	return nil
 }
 
@@ -635,6 +682,8 @@ func (ui *navigatorTUI) currentColumns() []string {
 			return []string{"result"}
 		}
 		return cols
+	case screenRecordDetail:
+		return nil
 	default:
 		return []string{"result"}
 	}
@@ -650,6 +699,8 @@ func (ui *navigatorTUI) currentRows() []map[string]any {
 		return ui.collectionRows()
 	case screenRecords:
 		return ui.result.Rows
+	case screenRecordDetail:
+		return nil
 	default:
 		return nil
 	}
@@ -713,17 +764,39 @@ func (ui *navigatorTUI) visibleColumns() []string {
 }
 
 func (ui *navigatorTUI) renderCurrentScreen() {
-	if ui.screen != screenRecords || ui.detailVisible {
-		ui.layout.ResizeItem(ui.detailView, 9, 0)
-	} else {
-		ui.layout.ResizeItem(ui.detailView, 0, 0)
-	}
 	ui.statusView.SetText(ui.statusText())
 	ui.helpView.SetText(ui.helpText())
 	ui.detailView.SetTitle(" " + ui.detailTitle() + " ")
-	ui.renderTable()
-	ui.renderDetail()
+	if ui.isRecordDetailScreen() {
+		ui.renderRecordDetailScreen()
+		ui.focusMain()
+		return
+	}
+	ui.renderNavigatorScreen()
 	ui.focusMain()
+}
+
+func (ui *navigatorTUI) renderNavigatorScreen() {
+	ui.layout.ResizeItem(ui.tableView, 0, 1)
+	if ui.shouldShowDetailPane() {
+		ui.layout.ResizeItem(ui.detailView, 9, 0)
+		ui.renderDetail()
+	} else {
+		ui.layout.ResizeItem(ui.detailView, 0, 0)
+		ui.detailView.SetText("")
+	}
+	ui.renderTable()
+}
+
+func (ui *navigatorTUI) renderRecordDetailScreen() {
+	ui.layout.ResizeItem(ui.tableView, 0, 0)
+	ui.layout.ResizeItem(ui.detailView, 0, 1)
+	body, err := ui.recordDetailText()
+	if err != nil {
+		ui.detailView.SetText(formatValue(ui.recordDetail))
+		return
+	}
+	ui.detailView.SetText(body)
 }
 
 func (ui *navigatorTUI) renderTable() {
@@ -765,6 +838,17 @@ func (ui *navigatorTUI) renderDetail() {
 	ui.detailView.SetText(string(body))
 }
 
+func (ui *navigatorTUI) recordDetailText() (string, error) {
+	if ui.recordDetail == nil {
+		return ui.emptyDetailText(), nil
+	}
+	body, err := json.MarshalIndent(ui.recordDetail, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
+}
+
 func (ui *navigatorTUI) selectedRow() (map[string]any, bool) {
 	rows := ui.currentRows()
 	if len(rows) == 0 {
@@ -774,6 +858,16 @@ func (ui *navigatorTUI) selectedRow() (map[string]any, bool) {
 		ui.selectedIndex = 0
 	}
 	return rows[ui.selectedIndex], true
+}
+
+func (ui *navigatorTUI) selectedRecordRow() (map[string]any, bool) {
+	if len(ui.result.Rows) == 0 {
+		return nil, false
+	}
+	if ui.selectedIndex < 0 || ui.selectedIndex >= len(ui.result.Rows) {
+		ui.selectedIndex = 0
+	}
+	return ui.result.Rows[ui.selectedIndex], true
 }
 
 func (ui *navigatorTUI) emptyDetailText() string {
@@ -786,6 +880,8 @@ func (ui *navigatorTUI) emptyDetailText() string {
 		return "No collections"
 	case screenRecords:
 		return "No records"
+	case screenRecordDetail:
+		return "No record detail"
 	default:
 		return "No data"
 	}
@@ -805,7 +901,9 @@ func (ui *navigatorTUI) moveSelection(delta int) {
 	}
 	ui.selectedIndex = next
 	ui.tableView.Select(ui.selectedIndex+1, 0)
-	ui.renderDetail()
+	if ui.shouldShowDetailPane() {
+		ui.renderDetail()
+	}
 }
 
 func (ui *navigatorTUI) shiftColumns(delta int) {
@@ -828,15 +926,6 @@ func (ui *navigatorTUI) shiftColumns(delta int) {
 	ui.renderTable()
 }
 
-func (ui *navigatorTUI) toggleDetail() {
-	ui.detailVisible = !ui.detailVisible
-	if ui.detailVisible {
-		ui.layout.ResizeItem(ui.detailView, 9, 0)
-	} else {
-		ui.layout.ResizeItem(ui.detailView, 0, 0)
-	}
-}
-
 func (ui *navigatorTUI) statusText() string {
 	parts := []string{"path=" + ui.breadcrumb()}
 	if ui.hasTarget {
@@ -845,7 +934,7 @@ func (ui *navigatorTUI) statusText() string {
 			parts = append(parts, "superuser="+ui.target.SU.Alias)
 		}
 	}
-	if ui.screen == screenRecords {
+	if ui.screen == screenRecords || ui.screen == screenRecordDetail {
 		parts = append(parts,
 			fmt.Sprintf("collection=%s", ui.recordsState.Collection),
 			fmt.Sprintf("page=%d", ui.recordsState.Page),
@@ -871,18 +960,21 @@ func (ui *navigatorTUI) breadcrumb() string {
 	if ui.hasTarget {
 		trail = append(trail, ui.target.DB.Alias)
 	}
-	if ui.screen == screenSuperusers || ui.screen == screenCollections || ui.screen == screenRecords {
+	if ui.screen == screenSuperusers || ui.screen == screenCollections || ui.screen == screenRecords || ui.screen == screenRecordDetail {
 		if strings.TrimSpace(ui.target.SU.Alias) != "" {
 			trail = append(trail, ui.target.SU.Alias)
 		} else if ui.screen == screenSuperusers {
 			trail = append(trail, "superusers")
 		}
 	}
-	if ui.screen == screenCollections || ui.screen == screenRecords {
+	if ui.screen == screenCollections || ui.screen == screenRecords || ui.screen == screenRecordDetail {
 		trail = append(trail, "collections")
 	}
-	if ui.screen == screenRecords && strings.TrimSpace(ui.recordsState.Collection) != "" {
+	if (ui.screen == screenRecords || ui.screen == screenRecordDetail) && strings.TrimSpace(ui.recordsState.Collection) != "" {
 		trail = append(trail, ui.recordsState.Collection)
+	}
+	if ui.screen == screenRecordDetail {
+		trail = append(trail, "record")
 	}
 	return strings.Join(trail, " > ")
 }
@@ -897,6 +989,8 @@ func (ui *navigatorTUI) helpText() string {
 		return "q quit  esc/backspace back  j/k move  Enter select  b db aliases  u superusers  r refresh"
 	case screenRecords:
 		return "q quit  esc/backspace back  j/k move  h/l or <-/-> horiz  / filter  s sort  c columns  b db aliases  u superusers  [/] page  g/G first/last  r refresh  Enter detail"
+	case screenRecordDetail:
+		return "q quit  esc/backspace back  y copy  b db aliases  u superusers"
 	default:
 		return "q quit"
 	}
@@ -912,9 +1006,15 @@ func (ui *navigatorTUI) detailTitle() string {
 		return "collection detail"
 	case screenRecords:
 		return "record detail"
+	case screenRecordDetail:
+		return "record detail"
 	default:
 		return "detail"
 	}
+}
+
+func (ui *navigatorTUI) shouldShowDetailPane() bool {
+	return ui.screen != screenRecords && ui.screen != screenRecordDetail && ui.detailVisible
 }
 
 func (ui *navigatorTUI) openInputModal(title, label, current string, apply func(string) error) {
@@ -1205,10 +1305,16 @@ func (ui *navigatorTUI) showError(err error) {
 }
 
 func (ui *navigatorTUI) focusMain() {
-	if ui.modalOpen || ui.app == nil || ui.tableView == nil {
+	if ui.modalOpen || ui.app == nil {
 		return
 	}
-	ui.app.SetFocus(ui.tableView)
+	if ui.isRecordDetailScreen() {
+		ui.app.SetFocus(ui.detailView)
+		return
+	}
+	if ui.tableView != nil {
+		ui.app.SetFocus(ui.tableView)
+	}
 }
 
 func (ui *navigatorTUI) dismissErrorModal() {
@@ -1279,6 +1385,21 @@ func (ui *navigatorTUI) syncLocalConfigState() error {
 			return err
 		}
 		return ui.fetchRecords()
+	case screenRecordDetail:
+		if strings.TrimSpace(ui.target.SU.Alias) == "" {
+			ui.screen = screenSuperusers
+			return ui.loadSuperusers()
+		}
+		if err := ui.loadCollections(); err != nil {
+			return err
+		}
+		if err := ui.fetchRecords(); err != nil {
+			return err
+		}
+		if row, ok := ui.selectedRecordRow(); ok {
+			ui.recordDetail = cloneRow(row)
+		}
+		return nil
 	default:
 		return nil
 	}
@@ -1292,6 +1413,7 @@ func (ui *navigatorTUI) resetToDBList() {
 	ui.superusers = nil
 	ui.collections = nil
 	ui.result = pocketbase.QueryResult{}
+	ui.recordDetail = nil
 	ui.totalItems = 0
 	ui.totalPages = 0
 	ui.selectedIndex = 0
@@ -1402,6 +1524,17 @@ func collectionName(row map[string]any) string {
 		return name
 	}
 	return strings.TrimSpace(formatValue(row["id"]))
+}
+
+func cloneRow(row map[string]any) map[string]any {
+	if row == nil {
+		return nil
+	}
+	out := make(map[string]any, len(row))
+	for key, value := range row {
+		out[key] = value
+	}
+	return out
 }
 
 func installFormArrowNavigation(form *tview.Form) {
