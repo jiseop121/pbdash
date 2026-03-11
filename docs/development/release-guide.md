@@ -16,6 +16,23 @@
 - `make release-tag`에는 `v` 없이 `x.y.z` 형식으로 넘긴다.
 - 실제 태그 이름은 `v0.4.1`처럼 `v` 접두어가 붙는다.
 
+## 머지 전 준비
+
+릴리즈 대상 변경은 PR 머지 전에 아래를 먼저 끝낸다.
+
+1. 최신 태그 또는 최신 GitHub Release 기준으로 다음 버전을 확정한다.
+2. 버전 관련 파일을 그 다음 버전으로 먼저 올린다.
+3. `go test ./...`와 `pbdash -c "version"` 기준으로 버전 불일치가 없는지 확인한다.
+4. 태그 릴리즈 노트 초안을 `docs/development/release-note-template.md` 템플릿으로 준비한다.
+5. 위 상태 그대로 PR을 머지한다.
+
+버전 관련 파일 최소 범위:
+
+- `internal/app/run.go`의 앱 버전 상수
+- `Formula/pbdash.rb`의 version 문자열
+
+다른 버전 표기 파일이 추가되면 같은 PR에서 함께 맞춘다.
+
 ## 태그 릴리스
 
 ```bash
@@ -66,6 +83,8 @@ make release-brew VERSION=0.4.1
 - 태그가 푸시되면 [`.github/workflows/release.yml`](/Users/hjs/Personal/multi-pocketbase-ui/.github/workflows/release.yml)이 Release를 생성하거나 갱신한다.
 - 별도 수동 릴리즈 노트 작성이나 덮어쓰기는 사용자가 명시적으로 요청한 경우에만 한다.
 - 수동 릴리즈 노트가 필요하면 태그 생성과 brew 배포 확인 이후에 진행한다.
+- 릴리즈 대상 PR은 머지 시점에 태그 릴리즈 노트 초안을 함께 준비한다.
+- 초안 형식은 `docs/development/release-note-template.md`를 기본으로 사용한다.
 
 수동 작성 시 확인할 기준:
 
@@ -96,13 +115,15 @@ make release-brew VERSION=0.4.1
 
 ## 실행 순서
 
-1. `git status --short`로 워킹 트리가 clean 상태인지 확인한다.
-2. `go test ./...`를 실행한다.
-3. `make release-tag VERSION=x.y.z`를 실행한다.
-4. GitHub Release가 생성되었는지 확인한다.
-5. `make release-brew VERSION=x.y.z`를 실행한다.
-6. Release asset 2개와 `Formula/pbdash.rb` 갱신 여부를 확인한다.
-7. brew 설치 후 `pbdash -c "version"` 출력이 기대 버전인지 확인한다.
+1. PR 머지 전에 버전 관련 파일이 다음 버전으로 이미 올라가 있는지 확인한다.
+2. PR 머지 전에 릴리즈 노트 초안을 `docs/development/release-note-template.md`로 준비한다.
+3. `git status --short`로 워킹 트리가 clean 상태인지 확인한다.
+4. `go test ./...`를 실행한다.
+5. `make release-tag VERSION=x.y.z`를 실행한다.
+6. GitHub Release가 생성되었는지 확인한다.
+7. `make release-brew VERSION=x.y.z`를 실행한다.
+8. Release asset 2개와 `Formula/pbdash.rb` 갱신 여부를 확인한다.
+9. brew 설치 후 `pbdash -c "version"` 출력이 기대 버전인지 확인한다.
 
 ## 확인 포인트
 
