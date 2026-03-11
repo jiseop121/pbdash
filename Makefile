@@ -33,7 +33,7 @@ endif
 POCKETBASE_ASSET := pocketbase_$(POCKETBASE_VERSION)_$(POCKETBASE_OS)_$(POCKETBASE_ARCH).zip
 POCKETBASE_DOWNLOAD_URL := https://github.com/pocketbase/pocketbase/releases/download/v$(POCKETBASE_VERSION)/$(POCKETBASE_ASSET)
 
-.PHONY: test e2e pocketbase-bin pocketbase-superuser pocketbase-serve release-tag release-brew
+.PHONY: test e2e pocketbase-bin pocketbase-superuser pocketbase-serve pb-su pb-serve release-tag release-brew
 
 test:
 	$(GO) test ./...
@@ -79,6 +79,10 @@ pocketbase-superuser: pocketbase-bin
 pocketbase-serve: pocketbase-bin
 	mkdir -p $(PB_WORKDIR)
 	cd $(PB_WORKDIR) && $(POCKETBASE_BIN) serve --http=$(PB_HTTP)
+
+pb-su: pocketbase-superuser
+
+pb-serve: pocketbase-serve
 
 release-tag:
 	@if [ -z "$(VERSION)" ]; then echo "VERSION is required. Example: make release-tag VERSION=0.2.1"; exit 1; fi

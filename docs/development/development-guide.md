@@ -72,3 +72,10 @@ make pocketbase-bin
 make pocketbase-superuser PB_SUPERUSER_EMAIL=root@example.com PB_SUPERUSER_PASSWORD=pass123456
 make pocketbase-serve PB_HTTP=127.0.0.1:8090
 ```
+
+짧은 별칭도 지원한다.
+
+```bash
+make pb-su PB_SUPERUSER_EMAIL=root@example.com PB_SUPERUSER_PASSWORD=pass123456
+make pb-serve PB_HTTP=127.0.0.1:8090
+```
