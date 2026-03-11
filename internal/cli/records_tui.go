@@ -248,111 +248,24 @@ func (ui *navigatorTUI) handleGlobalKey(event *tcell.EventKey) *tcell.EventKey {
 		return event
 	}
 
-	switch event.Key() {
-	case tcell.KeyEsc, tcell.KeyBackspace, tcell.KeyBackspace2:
-		ui.goBack()
+	if ui.consumeGlobalKey(event) {
 		return nil
 	}
-
-	if event.Rune() == 'q' {
-		ui.stopApplication()
-		return nil
-	}
-
 	return event
 }
 
 func (ui *navigatorTUI) handleKey(event *tcell.EventKey) *tcell.EventKey {
-	if ui.modalOpen {
+	if ui.modalOpen || event == nil {
 		return event
 	}
 
-	switch event.Key() {
-	case tcell.KeyEnter:
-		ui.handleEnter()
+	if ui.consumeNavigationKey(event.Key()) {
 		return nil
-	case tcell.KeyLeft:
-		if ui.screen == screenRecords {
-			ui.shiftColumns(-1)
-			return nil
-		}
-	case tcell.KeyRight:
-		if ui.screen == screenRecords {
-			ui.shiftColumns(1)
-			return nil
-		}
+	}
+	if ui.consumeRuneCommand(event.Rune()) {
+		return nil
 	}
 
-	switch event.Rune() {
-	case 'j':
-		ui.moveSelection(1)
-		return nil
-	case 'k':
-		ui.moveSelection(-1)
-		return nil
-	case 'h':
-		if ui.screen == screenRecords {
-			ui.shiftColumns(-1)
-			return nil
-		}
-	case 'l':
-		if ui.screen == screenRecords {
-			ui.shiftColumns(1)
-			return nil
-		}
-	case '/':
-		if ui.screen == screenRecords {
-			ui.openFilterModal()
-			return nil
-		}
-	case 's':
-		if ui.screen == screenRecords {
-			ui.openInputModal("Sort", "sort", ui.recordsState.Sort, func(val string) error {
-				ui.recordsState.Sort = strings.TrimSpace(val)
-				ui.recordsState.Page = 1
-				return ui.fetchAndRenderRecords()
-			})
-			return nil
-		}
-	case 'c':
-		if ui.screen == screenRecords {
-			ui.openColumnsModal()
-			return nil
-		}
-	case 'b':
-		ui.openDBManagerModal()
-		return nil
-	case 'u':
-		ui.openSuperuserManagerModal()
-		return nil
-	case 'r':
-		_ = ui.refreshCurrentScreen()
-		return nil
-	case '[':
-		if ui.screen == screenRecords && ui.recordsState.Page > 1 {
-			ui.recordsState.Page--
-			_ = ui.fetchAndRenderRecords()
-		}
-		return nil
-	case ']':
-		if ui.screen == screenRecords && (ui.totalPages == 0 || ui.recordsState.Page < ui.totalPages) {
-			ui.recordsState.Page++
-			_ = ui.fetchAndRenderRecords()
-		}
-		return nil
-	case 'g':
-		if ui.screen == screenRecords {
-			ui.recordsState.Page = 1
-			_ = ui.fetchAndRenderRecords()
-		}
-		return nil
-	case 'G':
-		if ui.screen == screenRecords && ui.totalPages > 0 {
-			ui.recordsState.Page = ui.totalPages
-			_ = ui.fetchAndRenderRecords()
-		}
-		return nil
-	}
 	return event
 }
 
@@ -362,6 +275,132 @@ func (ui *navigatorTUI) openFilterModal() {
 		ui.recordsState.Page = 1
 		return ui.fetchAndRenderRecords()
 	})
+}
+
+func (ui *navigatorTUI) openSortModal() {
+	ui.openInputModal("Sort", "sort", ui.recordsState.Sort, func(val string) error {
+		ui.recordsState.Sort = strings.TrimSpace(val)
+		ui.recordsState.Page = 1
+		return ui.fetchAndRenderRecords()
+	})
+}
+
+func (ui *navigatorTUI) consumeGlobalKey(event *tcell.EventKey) bool {
+	switch event.Key() {
+	case tcell.KeyEsc, tcell.KeyBackspace, tcell.KeyBackspace2:
+		ui.goBack()
+		return true
+	}
+
+	if event.Rune() == 'q' {
+		ui.stopApplication()
+		return true
+	}
+	return false
+}
+
+func (ui *navigatorTUI) consumeNavigationKey(key tcell.Key) bool {
+	switch key {
+	case tcell.KeyEnter:
+		ui.handleEnter()
+		return true
+	case tcell.KeyLeft:
+		return ui.shiftRecordsColumns(-1)
+	case tcell.KeyRight:
+		return ui.shiftRecordsColumns(1)
+	default:
+		return false
+	}
+}
+
+func (ui *navigatorTUI) consumeRuneCommand(key rune) bool {
+	switch key {
+	case 'j':
+		ui.moveSelection(1)
+		return true
+	case 'k':
+		ui.moveSelection(-1)
+		return true
+	case 'h':
+		return ui.shiftRecordsColumns(-1)
+	case 'l':
+		return ui.shiftRecordsColumns(1)
+	case '/':
+		return ui.openRecordsAction(ui.openFilterModal)
+	case 's':
+		return ui.openRecordsAction(ui.openSortModal)
+	case 'c':
+		return ui.openRecordsAction(ui.openColumnsModal)
+	case 'b':
+		ui.openDBManagerModal()
+		return true
+	case 'u':
+		ui.openSuperuserManagerModal()
+		return true
+	case 'r':
+		_ = ui.refreshCurrentScreen()
+		return true
+	case '[':
+		return ui.moveToPreviousRecordsPage()
+	case ']':
+		return ui.moveToNextRecordsPage()
+	case 'g':
+		return ui.jumpToRecordsPage(1)
+	case 'G':
+		if ui.totalPages == 0 {
+			return false
+		}
+		return ui.jumpToRecordsPage(ui.totalPages)
+	default:
+		return false
+	}
+}
+
+func (ui *navigatorTUI) openRecordsAction(action func()) bool {
+	if !ui.isRecordsScreen() {
+		return false
+	}
+	action()
+	return true
+}
+
+func (ui *navigatorTUI) shiftRecordsColumns(delta int) bool {
+	if !ui.isRecordsScreen() {
+		return false
+	}
+	ui.shiftColumns(delta)
+	return true
+}
+
+func (ui *navigatorTUI) moveToPreviousRecordsPage() bool {
+	if !ui.isRecordsScreen() || ui.recordsState.Page <= 1 {
+		return false
+	}
+	ui.recordsState.Page--
+	_ = ui.fetchAndRenderRecords()
+	return true
+}
+
+func (ui *navigatorTUI) moveToNextRecordsPage() bool {
+	if !ui.isRecordsScreen() || (ui.totalPages > 0 && ui.recordsState.Page >= ui.totalPages) {
+		return false
+	}
+	ui.recordsState.Page++
+	_ = ui.fetchAndRenderRecords()
+	return true
+}
+
+func (ui *navigatorTUI) jumpToRecordsPage(page int) bool {
+	if !ui.isRecordsScreen() || page <= 0 {
+		return false
+	}
+	ui.recordsState.Page = page
+	_ = ui.fetchAndRenderRecords()
+	return true
+}
+
+func (ui *navigatorTUI) isRecordsScreen() bool {
+	return ui.screen == screenRecords
 }
 
 func (ui *navigatorTUI) handleEnter() {
@@ -1394,38 +1433,10 @@ func remapFormArrowNavigation(focused tview.Primitive, event *tcell.EventKey) *t
 		return nil
 	}
 
-	switch item := focused.(type) {
-	case *tview.InputField:
-		switch event.Key() {
-		case tcell.KeyUp:
-			return tcell.NewEventKey(tcell.KeyBacktab, 0, tcell.ModNone)
-		case tcell.KeyDown:
-			return tcell.NewEventKey(tcell.KeyTab, 0, tcell.ModNone)
-		default:
-			return event
-		}
-	case *tview.DropDown:
-		if item.IsOpen() {
-			return event
-		}
-		switch event.Key() {
-		case tcell.KeyUp, tcell.KeyLeft:
-			return tcell.NewEventKey(tcell.KeyBacktab, 0, tcell.ModNone)
-		case tcell.KeyDown, tcell.KeyRight:
-			return tcell.NewEventKey(tcell.KeyTab, 0, tcell.ModNone)
-		default:
-			return event
-		}
-	default:
-		switch event.Key() {
-		case tcell.KeyUp, tcell.KeyLeft:
-			return tcell.NewEventKey(tcell.KeyBacktab, 0, tcell.ModNone)
-		case tcell.KeyDown, tcell.KeyRight:
-			return tcell.NewEventKey(tcell.KeyTab, 0, tcell.ModNone)
-		default:
-			return event
-		}
+	if key, ok := formNavigationKey(focused, event.Key()); ok {
+		return tcell.NewEventKey(key, 0, tcell.ModNone)
 	}
+	return event
 }
 
 func remapSubmitCancelNavigation(focused tview.Primitive, event *tcell.EventKey, apply, cancel func()) *tcell.EventKey {
@@ -1447,6 +1458,38 @@ func remapSubmitCancelNavigation(focused tview.Primitive, event *tcell.EventKey,
 	default:
 		return remapFormArrowNavigation(focused, event)
 	}
+}
+
+func formNavigationKey(focused tview.Primitive, key tcell.Key) (tcell.Key, bool) {
+	if isOpenDropDown(focused) {
+		return 0, false
+	}
+
+	switch focused.(type) {
+	case *tview.InputField:
+		switch key {
+		case tcell.KeyUp:
+			return tcell.KeyBacktab, true
+		case tcell.KeyDown:
+			return tcell.KeyTab, true
+		default:
+			return 0, false
+		}
+	default:
+		switch key {
+		case tcell.KeyUp, tcell.KeyLeft:
+			return tcell.KeyBacktab, true
+		case tcell.KeyDown, tcell.KeyRight:
+			return tcell.KeyTab, true
+		default:
+			return 0, false
+		}
+	}
+}
+
+func isOpenDropDown(focused tview.Primitive) bool {
+	dropdown, ok := focused.(*tview.DropDown)
+	return ok && dropdown.IsOpen()
 }
 
 func mergeColumns(observed map[string]struct{}, fresh []string) []string {

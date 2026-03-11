@@ -31,6 +31,7 @@
 - 현재 사용 방식
   - 방향키, Enter, Esc, Backspace 등 이벤트 처리를 `tcell.EventKey` 기준으로 분기한다.
   - 선택 행 스타일과 같은 기본 TUI 색상도 `tcell.Style`로 설정한다.
+  - records TUI 렌더링 회귀는 `SimulationScreen` 기반 테스트에서 실제 키 주입과 화면 텍스트 일부를 검증한다.
 - 주의사항
   - 키 코드 또는 입력 처리 규칙이 바뀌면 TUI 탐색성이 바로 깨질 수 있다.
   - `j/k` 같은 단축키 지원 여부와 방향키 동작은 테스트와 함께 유지한다.
