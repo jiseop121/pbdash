@@ -104,30 +104,117 @@ func TestRunRecordsTUIUsesNavigatorRunner(t *testing.T) {
 }
 
 func TestNavigatorTUISetupViewsCapturesTableShortcuts(t *testing.T) {
-	ui := &navigatorTUI{
-		app:           tview.NewApplication(),
-		statusView:    tview.NewTextView(),
-		tableView:     tview.NewTable(),
-		detailView:    tview.NewTextView(),
-		helpView:      tview.NewTextView(),
-		screen:        screenRecords,
-		detailVisible: true,
-		observedCols:  map[string]struct{}{},
-		result: pocketbase.QueryResult{Rows: []map[string]any{
-			{"id": "1", "title": "first"},
-			{"id": "2", "title": "second"},
-		}},
-	}
+	ui := newTestNavigatorTUI()
 
 	ui.setupViews()
 	handler := ui.tableView.InputHandler()
 	require.NotNil(t, handler)
+	assert.Same(t, ui.tableView, ui.app.GetFocus())
 
 	handler(tcell.NewEventKey(tcell.KeyRune, 'j', tcell.ModNone), func(tview.Primitive) {})
 	assert.Equal(t, 1, ui.selectedIndex)
 
 	handler(tcell.NewEventKey(tcell.KeyEnter, 0, tcell.ModNone), func(tview.Primitive) {})
 	assert.False(t, ui.detailVisible)
+}
+
+func TestNavigatorTUIRenderCurrentScreenRestoresMainFocus(t *testing.T) {
+	ui := newTestNavigatorTUI()
+	ui.setupViews()
+
+	ui.app.SetFocus(ui.detailView)
+	ui.renderCurrentScreen()
+
+	assert.Same(t, ui.tableView, ui.app.GetFocus())
+}
+
+func TestNavigatorTUIPushAndBackRestoreMainFocus(t *testing.T) {
+	ui := newTestNavigatorTUI()
+	ui.setupViews()
+
+	ui.app.SetFocus(ui.detailView)
+	ui.pushScreen(screenCollections)
+	assert.Same(t, ui.tableView, ui.app.GetFocus())
+
+	ui.app.SetFocus(ui.detailView)
+	ui.goBack()
+	assert.Same(t, ui.tableView, ui.app.GetFocus())
+}
+
+func TestNavigatorTUICloseAndDismissErrorRestoreMainFocus(t *testing.T) {
+	ui := newTestNavigatorTUI()
+	ui.setupViews()
+
+	ui.modalOpen = true
+	ui.pages.AddPage("test-modal", tview.NewTextView(), true, true)
+	ui.closeModal("test-modal")
+	assert.False(t, ui.modalOpen)
+	assert.False(t, ui.pages.HasPage("test-modal"))
+	assert.Same(t, ui.tableView, ui.app.GetFocus())
+
+	ui.showError(assert.AnError)
+	require.True(t, ui.modalOpen)
+	require.True(t, ui.pages.HasPage("error"))
+
+	ui.dismissErrorModal()
+	assert.False(t, ui.modalOpen)
+	assert.False(t, ui.pages.HasPage("error"))
+	assert.Same(t, ui.tableView, ui.app.GetFocus())
+}
+
+func TestNavigatorTUIRefreshShortcutRestoresMainFocus(t *testing.T) {
+	dispatcher := NewDispatcher(DispatcherConfig{Stdout: bytes.NewBuffer(nil), Version: "test", DataDir: t.TempDir()})
+	_, err := dispatcher.saveDBAlias("dev", "http://127.0.0.1:8090")
+	require.NoError(t, err)
+
+	ui := newTestNavigatorTUI()
+	ui.dispatcher = dispatcher
+	ui.screen = screenDBList
+	ui.dbs = []storage.DB{{Alias: "stale", BaseURL: "http://stale"}}
+	ui.setupViews()
+
+	ui.app.SetFocus(ui.detailView)
+	handler := ui.tableView.InputHandler()
+	require.NotNil(t, handler)
+
+	handler(tcell.NewEventKey(tcell.KeyRune, 'r', tcell.ModNone), func(tview.Primitive) {})
+
+	require.Len(t, ui.dbs, 1)
+	assert.Equal(t, "dev", ui.dbs[0].Alias)
+	assert.Same(t, ui.tableView, ui.app.GetFocus())
+}
+
+func TestNavigatorTUIHandleKeyManagerShortcutsAndQuit(t *testing.T) {
+	dispatcher := NewDispatcher(DispatcherConfig{Stdout: bytes.NewBuffer(nil), Version: "test", DataDir: t.TempDir()})
+	_, err := dispatcher.saveDBAlias("dev", "http://127.0.0.1:8090")
+	require.NoError(t, err)
+
+	ui := newTestNavigatorTUI()
+	ui.dispatcher = dispatcher
+	ui.screen = screenDBList
+	ui.dbs = []storage.DB{{Alias: "dev", BaseURL: "http://127.0.0.1:8090"}}
+
+	stopped := false
+	ui.stop = func() {
+		stopped = true
+	}
+
+	ui.setupViews()
+	handler := ui.tableView.InputHandler()
+	require.NotNil(t, handler)
+
+	handler(tcell.NewEventKey(tcell.KeyRune, 'b', tcell.ModNone), func(tview.Primitive) {})
+	require.True(t, ui.modalOpen)
+	assert.True(t, ui.pages.HasPage("db-manager"))
+	ui.closeModal("db-manager")
+
+	handler(tcell.NewEventKey(tcell.KeyRune, 'u', tcell.ModNone), func(tview.Primitive) {})
+	require.True(t, ui.modalOpen)
+	assert.True(t, ui.pages.HasPage("superuser-manager"))
+	ui.closeModal("superuser-manager")
+
+	handler(tcell.NewEventKey(tcell.KeyRune, 'q', tcell.ModNone), func(tview.Primitive) {})
+	assert.True(t, stopped)
 }
 
 func TestDBManagerStateSelectAlias(t *testing.T) {
@@ -264,6 +351,24 @@ func TestSuperuserManagerStateRemoveRequiresSelection(t *testing.T) {
 	err := (superuserManagerState{selectedDB: "dev"}).remove(NewDispatcher(DispatcherConfig{Stdout: bytes.NewBuffer(nil), Version: "test", DataDir: t.TempDir()}))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Select an existing superuser first")
+}
+
+func newTestNavigatorTUI() *navigatorTUI {
+	return &navigatorTUI{
+		app:           tview.NewApplication(),
+		stop:          func() {},
+		statusView:    tview.NewTextView(),
+		tableView:     tview.NewTable(),
+		detailView:    tview.NewTextView(),
+		helpView:      tview.NewTextView(),
+		screen:        screenRecords,
+		detailVisible: true,
+		observedCols:  map[string]struct{}{},
+		result: pocketbase.QueryResult{Rows: []map[string]any{
+			{"id": "1", "title": "first"},
+			{"id": "2", "title": "second"},
+		}},
+	}
 }
 
 func queryResultWithColumns(count int) pocketbaseQueryResult {

@@ -41,6 +41,7 @@ type navigatorTUI struct {
 	ctx        context.Context
 
 	app    *tview.Application
+	stop   func()
 	pages  *tview.Pages
 	layout *tview.Flex
 
@@ -160,6 +161,7 @@ func (d *Dispatcher) runNavigatorTUI(ctx context.Context, route navigatorRoute) 
 		detailVisible: true,
 		observedCols:  map[string]struct{}{},
 	}
+	ui.stop = ui.app.Stop
 	if err := ui.bootstrap(route); err != nil {
 		return err
 	}
@@ -174,7 +176,10 @@ func (d *Dispatcher) runNavigatorTUI(ctx context.Context, route navigatorRoute) 
 		}
 	}()
 
-	err := ui.app.SetRoot(ui.pages, true).SetFocus(ui.tableView).Run()
+	ui.app.SetRoot(ui.pages, true)
+	ui.focusMain()
+
+	err := ui.app.Run()
 	close(done)
 	if err != nil {
 		return apperr.RuntimeErr("Could not run TUI mode.", "", err)
@@ -206,7 +211,6 @@ func (ui *navigatorTUI) bootstrap(route navigatorRoute) error {
 }
 
 func (ui *navigatorTUI) setupViews() {
-	ui.app.SetInputCapture(ui.handleKey)
 	ui.statusView.SetDynamicColors(true)
 
 	ui.tableView.SetBorders(false)
@@ -234,7 +238,6 @@ func (ui *navigatorTUI) setupViews() {
 	ui.layout.AddItem(ui.helpView, 1, 0, false)
 
 	ui.pages = tview.NewPages().AddPage("main", ui.layout, true, true)
-	ui.pages.SetInputCapture(ui.handleKey)
 
 	ui.renderCurrentScreen()
 }
@@ -265,7 +268,7 @@ func (ui *navigatorTUI) handleKey(event *tcell.EventKey) *tcell.EventKey {
 
 	switch event.Rune() {
 	case 'q':
-		ui.app.Stop()
+		ui.stopApplication()
 		return nil
 	case 'j':
 		ui.moveSelection(1)
@@ -658,6 +661,7 @@ func (ui *navigatorTUI) renderCurrentScreen() {
 	ui.detailView.SetTitle(" " + ui.detailTitle() + " ")
 	ui.renderTable()
 	ui.renderDetail()
+	ui.focusMain()
 }
 
 func (ui *navigatorTUI) renderTable() {
@@ -1097,7 +1101,7 @@ func (ui *navigatorTUI) reloadAfterLocalConfigChange(status string) {
 func (ui *navigatorTUI) closeModal(name string) {
 	ui.pages.RemovePage(name)
 	ui.modalOpen = false
-	ui.app.SetFocus(ui.tableView)
+	ui.focusMain()
 }
 
 func (ui *navigatorTUI) showError(err error) {
@@ -1110,9 +1114,7 @@ func (ui *navigatorTUI) showError(err error) {
 	text.SetBorder(true).SetTitle(" Error ")
 
 	form := tview.NewForm().AddButton("OK", func() {
-		ui.pages.RemovePage("error")
-		ui.modalOpen = false
-		ui.app.SetFocus(ui.tableView)
+		ui.dismissErrorModal()
 	})
 	form.SetButtonsAlign(tview.AlignCenter)
 	container := tview.NewFlex().SetDirection(tview.FlexRow)
@@ -1121,6 +1123,29 @@ func (ui *navigatorTUI) showError(err error) {
 
 	ui.pages.AddPage("error", center(80, 12, container), true, true)
 	ui.app.SetFocus(form)
+}
+
+func (ui *navigatorTUI) focusMain() {
+	if ui.modalOpen || ui.app == nil || ui.tableView == nil {
+		return
+	}
+	ui.app.SetFocus(ui.tableView)
+}
+
+func (ui *navigatorTUI) dismissErrorModal() {
+	ui.pages.RemovePage("error")
+	ui.modalOpen = false
+	ui.focusMain()
+}
+
+func (ui *navigatorTUI) stopApplication() {
+	if ui.stop != nil {
+		ui.stop()
+		return
+	}
+	if ui.app != nil {
+		ui.app.Stop()
+	}
 }
 
 func (ui *navigatorTUI) syncLocalConfigState() error {
