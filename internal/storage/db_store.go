@@ -112,6 +112,12 @@ func (s *DBStore) Remove(alias string) error {
 	return s.writeAll(filtered)
 }
 
+func (s *DBStore) ReplaceAll(items []DB) error {
+	cloned := make([]DB, len(items))
+	copy(cloned, items)
+	return s.writeAll(cloned)
+}
+
 func (s *DBStore) Find(alias string) (DB, bool, error) {
 	items, err := s.readAll()
 	if err != nil {

@@ -213,6 +213,12 @@ func (s *SuperuserStore) ReassignDBAlias(currentAlias, nextAlias string) error {
 	return s.writeAll(items)
 }
 
+func (s *SuperuserStore) ReplaceAll(items []Superuser) error {
+	cloned := make([]Superuser, len(items))
+	copy(cloned, items)
+	return s.writeAll(cloned)
+}
+
 func (s *SuperuserStore) Find(dbAlias, alias string) (Superuser, bool, error) {
 	items, err := s.readAll()
 	if err != nil {

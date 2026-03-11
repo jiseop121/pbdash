@@ -43,6 +43,9 @@ type Dispatcher struct {
 	ctxStore *storage.ContextStore
 	pbClient *pocketbase.Client
 
+	saveSavedContext  func(storage.Context) error
+	clearSavedContext func() error
+
 	sessionCtx commandContext
 	savedCtx   commandContext
 	hasSaved   bool
@@ -59,17 +62,20 @@ type Dispatcher struct {
 }
 
 func NewDispatcher(cfg DispatcherConfig) *Dispatcher {
+	ctxStore := storage.NewContextStore(cfg.DataDir)
 	d := &Dispatcher{
 		stdout:      cfg.Stdout,
 		version:     cfg.Version,
 		dbStore:     storage.NewDBStore(cfg.DataDir),
 		suStore:     storage.NewSuperuserStore(cfg.DataDir),
-		ctxStore:    storage.NewContextStore(cfg.DataDir),
+		ctxStore:    ctxStore,
 		pbClient:    pocketbase.NewClient(),
 		authCache:   map[authCacheKey]authCacheEntry{},
 		now:         time.Now,
 		startupErrs: make([]error, 0),
 	}
+	d.saveSavedContext = ctxStore.Save
+	d.clearSavedContext = ctxStore.Clear
 	d.navigatorRunner = func(ctx context.Context, route navigatorRoute) error {
 		return d.runNavigatorTUI(ctx, route)
 	}

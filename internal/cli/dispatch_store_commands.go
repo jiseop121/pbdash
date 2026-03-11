@@ -8,6 +8,15 @@ import (
 	"github.com/jiseop121/pbdash/internal/storage"
 )
 
+type localConfigSnapshot struct {
+	dbs        []storage.DB
+	superusers []storage.Superuser
+	sessionCtx commandContext
+	savedCtx   commandContext
+	hasSaved   bool
+	authCache  map[authCacheKey]authCacheEntry
+}
+
 func (d *Dispatcher) execDB(args []string) error {
 	if len(args) == 0 {
 		return apperr.Invalid("Missing db subcommand.", "Use: db add|list|remove")
@@ -232,11 +241,9 @@ func (d *Dispatcher) execContextUnsave(args []string) error {
 	if len(args) > 0 {
 		return apperr.Invalid("`context unsave` does not accept extra arguments.", "Use: context unsave")
 	}
-	if err := d.ctxStore.Clear(); err != nil {
-		return mapStoreError(err)
+	if err := d.clearSavedContextState(); err != nil {
+		return err
 	}
-	d.savedCtx = commandContext{}
-	d.hasSaved = false
 	_, _ = fmt.Fprintln(d.stdout, "Removed saved default context.")
 	return nil
 }
@@ -249,26 +256,40 @@ func (d *Dispatcher) saveDBAlias(alias, baseURL string) (storage.DB, error) {
 }
 
 func (d *Dispatcher) updateDBAlias(currentAlias, nextAlias, baseURL string) (storage.DB, error) {
-	if err := d.dbStore.Update(currentAlias, nextAlias, baseURL); err != nil {
-		return storage.DB{}, mapStoreError(err)
-	}
-	if !strings.EqualFold(currentAlias, nextAlias) {
-		if err := d.renameDBAliasReferences(currentAlias, nextAlias); err != nil {
-			return storage.DB{}, err
+	var updated storage.DB
+	err := d.runWithLocalConfigRollback(func() error {
+		if err := d.dbStore.Update(currentAlias, nextAlias, baseURL); err != nil {
+			return mapStoreError(err)
 		}
+		if !strings.EqualFold(currentAlias, nextAlias) {
+			if err := d.renameDBAliasReferences(currentAlias, nextAlias); err != nil {
+				return err
+			}
+		}
+		reloaded, err := d.reloadDBAlias(nextAlias, "Updated db alias could not be reloaded.")
+		if err != nil {
+			return err
+		}
+		updated = reloaded
+		return nil
+	})
+	if err != nil {
+		return storage.DB{}, err
 	}
-	return d.reloadDBAlias(nextAlias, "Updated db alias could not be reloaded.")
+	return updated, nil
 }
 
 func (d *Dispatcher) removeDBAlias(alias string) error {
-	if err := d.dbStore.Remove(alias); err != nil {
-		return mapStoreError(err)
-	}
-	if err := d.suStore.RemoveByDB(alias); err != nil {
-		return mapStoreError(err)
-	}
-	d.clearAuthCacheByDB(alias)
-	return d.dropContextByDB(alias)
+	return d.runWithLocalConfigRollback(func() error {
+		if err := d.dbStore.Remove(alias); err != nil {
+			return mapStoreError(err)
+		}
+		if err := d.suStore.RemoveByDB(alias); err != nil {
+			return mapStoreError(err)
+		}
+		d.clearAuthCacheByDB(alias)
+		return d.dropContextByDB(alias)
+	})
 }
 
 func (d *Dispatcher) saveSuperuser(dbAlias, alias, email, password string) (storage.Superuser, error) {
@@ -282,24 +303,38 @@ func (d *Dispatcher) saveSuperuser(dbAlias, alias, email, password string) (stor
 }
 
 func (d *Dispatcher) updateSuperuser(dbAlias, currentAlias, nextAlias, email, password string) (storage.Superuser, error) {
-	if err := d.suStore.Update(dbAlias, currentAlias, nextAlias, email, password); err != nil {
-		return storage.Superuser{}, mapStoreError(err)
-	}
-	if !strings.EqualFold(currentAlias, nextAlias) {
-		if err := d.renameContextSuperuserAlias(dbAlias, currentAlias, nextAlias); err != nil {
-			return storage.Superuser{}, err
+	var updated storage.Superuser
+	err := d.runWithLocalConfigRollback(func() error {
+		if err := d.suStore.Update(dbAlias, currentAlias, nextAlias, email, password); err != nil {
+			return mapStoreError(err)
 		}
-		d.clearAuthCacheForAlias(dbAlias, currentAlias)
+		if !strings.EqualFold(currentAlias, nextAlias) {
+			if err := d.renameContextSuperuserAlias(dbAlias, currentAlias, nextAlias); err != nil {
+				return err
+			}
+			d.clearAuthCacheForAlias(dbAlias, currentAlias)
+		}
+		reloaded, err := d.reloadSuperuser(dbAlias, nextAlias, "Updated superuser alias could not be reloaded.")
+		if err != nil {
+			return err
+		}
+		updated = reloaded
+		return nil
+	})
+	if err != nil {
+		return storage.Superuser{}, err
 	}
-	return d.reloadSuperuser(dbAlias, nextAlias, "Updated superuser alias could not be reloaded.")
+	return updated, nil
 }
 
 func (d *Dispatcher) removeSuperuser(dbAlias, alias string) error {
-	if err := d.suStore.Remove(dbAlias, alias); err != nil {
-		return mapStoreError(err)
-	}
-	d.clearAuthCacheForAlias(dbAlias, alias)
-	return d.dropContextBySuperuser(dbAlias, alias)
+	return d.runWithLocalConfigRollback(func() error {
+		if err := d.suStore.Remove(dbAlias, alias); err != nil {
+			return mapStoreError(err)
+		}
+		d.clearAuthCacheForAlias(dbAlias, alias)
+		return d.dropContextBySuperuser(dbAlias, alias)
+	})
 }
 
 func (d *Dispatcher) buildContextSelection(dbAlias, suAlias string) (commandContext, error) {
@@ -366,7 +401,7 @@ func (d *Dispatcher) renameDBAliasReferences(currentAlias, nextAlias string) err
 }
 
 func (d *Dispatcher) persistSavedContext(ctx commandContext) error {
-	err := d.ctxStore.Save(storage.Context{DBAlias: ctx.DBAlias, SuperuserAlias: ctx.SuperuserAlias})
+	err := d.saveSavedContext(storage.Context{DBAlias: ctx.DBAlias, SuperuserAlias: ctx.SuperuserAlias})
 	if err != nil {
 		return mapStoreError(err)
 	}
@@ -380,11 +415,9 @@ func (d *Dispatcher) dropContextByDB(dbAlias string) error {
 		d.sessionCtx = commandContext{}
 	}
 	if d.hasSaved && strings.EqualFold(d.savedCtx.DBAlias, dbAlias) {
-		if err := d.ctxStore.Clear(); err != nil {
-			return mapStoreError(err)
+		if err := d.clearSavedContextState(); err != nil {
+			return err
 		}
-		d.savedCtx = commandContext{}
-		d.hasSaved = false
 	}
 	return nil
 }
@@ -438,6 +471,84 @@ func (d *Dispatcher) clearAuthCacheByDB(dbAlias string) {
 
 func (d *Dispatcher) clearAuthCacheForAlias(dbAlias, suAlias string) {
 	delete(d.authCache, authCacheKey{dbAlias: strings.ToLower(dbAlias), suAlias: strings.ToLower(suAlias)})
+}
+
+func (d *Dispatcher) runWithLocalConfigRollback(run func() error) error {
+	snapshot, err := d.snapshotLocalConfig()
+	if err != nil {
+		return err
+	}
+	if err := run(); err != nil {
+		if restoreErr := d.restoreLocalConfig(snapshot); restoreErr != nil {
+			return apperr.RuntimeErr("Could not rollback local config after a failed update.", "", fmt.Errorf("%v; rollback failed: %w", err, restoreErr))
+		}
+		return err
+	}
+	return nil
+}
+
+func (d *Dispatcher) snapshotLocalConfig() (localConfigSnapshot, error) {
+	dbs, err := d.dbStore.List()
+	if err != nil {
+		return localConfigSnapshot{}, mapStoreError(err)
+	}
+	superusers, err := d.suStore.List()
+	if err != nil {
+		return localConfigSnapshot{}, mapStoreError(err)
+	}
+	return localConfigSnapshot{
+		dbs:        dbs,
+		superusers: superusers,
+		sessionCtx: d.sessionCtx,
+		savedCtx:   d.savedCtx,
+		hasSaved:   d.hasSaved,
+		authCache:  cloneAuthCache(d.authCache),
+	}, nil
+}
+
+func (d *Dispatcher) restoreLocalConfig(snapshot localConfigSnapshot) error {
+	if err := d.dbStore.ReplaceAll(snapshot.dbs); err != nil {
+		return mapStoreError(err)
+	}
+	if err := d.suStore.ReplaceAll(snapshot.superusers); err != nil {
+		return mapStoreError(err)
+	}
+	d.sessionCtx = snapshot.sessionCtx
+	d.savedCtx = snapshot.savedCtx
+	d.hasSaved = snapshot.hasSaved
+	d.authCache = cloneAuthCache(snapshot.authCache)
+	if snapshot.hasSaved {
+		if err := d.saveSavedContext(storage.Context{
+			DBAlias:        snapshot.savedCtx.DBAlias,
+			SuperuserAlias: snapshot.savedCtx.SuperuserAlias,
+		}); err != nil {
+			return mapStoreError(err)
+		}
+		return nil
+	}
+	if err := d.clearSavedContextState(); err != nil {
+		return err
+	}
+	d.sessionCtx = snapshot.sessionCtx
+	d.authCache = cloneAuthCache(snapshot.authCache)
+	return nil
+}
+
+func (d *Dispatcher) clearSavedContextState() error {
+	if err := d.clearSavedContext(); err != nil {
+		return mapStoreError(err)
+	}
+	d.savedCtx = commandContext{}
+	d.hasSaved = false
+	return nil
+}
+
+func cloneAuthCache(src map[authCacheKey]authCacheEntry) map[authCacheKey]authCacheEntry {
+	cloned := make(map[authCacheKey]authCacheEntry, len(src))
+	for key, value := range src {
+		cloned[key] = value
+	}
+	return cloned
 }
 
 func dbRows(items []storage.DB) []map[string]any {
