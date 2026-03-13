@@ -2,17 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.5.0] - 2026-03-12
+## [0.6.0] - 2026-03-12
 
 ### Added
-- Added in-TUI local configuration management for saved `db` aliases and `superuser` aliases from the records view.
+- Press `Enter` on a record to open a dedicated record detail screen. In the detail view, press `y` to copy the current record JSON to the clipboard.
+- Collections list now shows collection names instead of internal IDs.
 
 ### Changed
-- Refactored records TUI and local store command flows around a primary-flow-first structure.
-- Fixed full-screen records TUI shortcut handling so `q`, `j/k`, `Enter`, `r`, and related keys are captured reliably from the focused view.
-- Made db alias removal also clear locally saved superusers for that db and keep context/cache references in sync on rename/delete.
+- Keyboard navigation across forms and modals now supports arrow keys in addition to `Tab` and `Shift+Tab`.
 
-## [0.4.2] - 2026-03-10
+## [0.5.2] - 2026-03-12
+
+### Changed
+- Stability and release infrastructure improvements. No user-visible changes.
+
+## [0.5.1] - 2026-03-12
+
+### Changed
+- Restored TUI key focus so `q`, `j/k`, `Enter`, and related keys are reliably captured from the focused view.
+- Simplified PocketBase setup and connection handling.
+
+## [0.5.0] - 2026-03-12
 
 ### Added
 - Added in-TUI local configuration management for saved `db` aliases and `superuser` aliases from the records view.
