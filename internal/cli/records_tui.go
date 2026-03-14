@@ -833,6 +833,9 @@ func (ui *navigatorTUI) renderTable() {
 	}
 	if len(rows) == 0 {
 		ui.selectedIndex = 0
+		msg := ui.emptyTableMessage()
+		cell := tview.NewTableCell(msg).SetSelectable(false)
+		ui.tableView.SetCell(1, 0, cell)
 		return
 	}
 	if ui.selectedIndex >= len(rows) {
@@ -885,6 +888,13 @@ func (ui *navigatorTUI) selectedRecordRow() (map[string]any, bool) {
 		ui.selectedIndex = 0
 	}
 	return ui.result.Rows[ui.selectedIndex], true
+}
+
+func (ui *navigatorTUI) emptyTableMessage() string {
+	if ui.screen == screenRecords && strings.TrimSpace(ui.recordsState.Filter) != "" {
+		return "No records match filter: " + ui.recordsState.Filter
+	}
+	return ui.emptyDetailText()
 }
 
 func (ui *navigatorTUI) emptyDetailText() string {
