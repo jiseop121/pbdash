@@ -89,10 +89,6 @@ func newDBManagerState(items []storage.DB) dbManagerState {
 	return dbManagerState{items: items}
 }
 
-func (m dbManagerState) choices() []string {
-	return dbManagerChoices(m.items)
-}
-
 func (m *dbManagerState) selectAlias(value string) (storage.DB, bool) {
 	m.selectedAlias = normalizeManagerSelection(value)
 	return findDB(m.items, m.selectedAlias)
@@ -351,10 +347,10 @@ func (ui *navigatorTUI) consumeRuneCommand(key rune) bool {
 		}
 		return false
 	case 'b':
-		ui.openDBManagerModal()
+		ui.openDBListModal()
 		return true
 	case 'u':
-		ui.openSuperuserManagerModal()
+		ui.openSuperuserListModal()
 		return true
 	case 'r':
 		if ui.isRecordDetailScreen() {
@@ -1158,50 +1154,147 @@ func (ui *navigatorTUI) openColumnsModal() {
 	ui.app.SetFocus(form)
 }
 
-func (ui *navigatorTUI) openDBManagerModal() {
+func (ui *navigatorTUI) openDBListModal() {
+	const pageName = "db-list"
 	items, err := ui.dispatcher.dbStore.List()
 	if err != nil {
 		ui.showError(mapStoreError(err))
 		return
 	}
 
-	manager := newDBManagerState(items)
-	form := tview.NewForm()
-	form.AddDropDown("select", manager.choices(), 0, nil)
-	form.AddInputField("alias", "", 0, nil, nil)
-	form.AddInputField("base url", "", 0, nil, nil)
+	table := buildManagerTable(dbListRows(items))
+	closeFn := func() { ui.closeModal(pageName) }
 
-	dropdown := form.GetFormItem(0).(*tview.DropDown)
-	aliasField := form.GetFormItem(1).(*tview.InputField)
-	baseURLField := form.GetFormItem(2).(*tview.InputField)
-
-	aliasField.SetPlaceholder("my-app")
-	baseURLField.SetPlaceholder("https://my-app.pockethost.io")
-
-	dropdown.SetSelectedFunc(func(text string, _ int) {
-		applyDBFormSelection(&manager, aliasField, baseURLField, text)
+	table.SetSelectedFunc(func(row, _ int) {
+		if row >= 0 && row < len(items) {
+			item := items[row]
+			ui.pages.RemovePage(pageName)
+			ui.openDBEditModal(&item)
+		}
 	})
-	applyDBFormSelection(&manager, aliasField, baseURLField, managerNewOption)
-
-	form.AddButton("Save", func() {
-		ui.saveDBManager(manager, aliasField.GetText(), baseURLField.GetText())
+	table.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		switch event.Key() {
+		case tcell.KeyEsc:
+			closeFn()
+			return nil
+		}
+		return event
 	})
-	form.AddButton("Delete", func() {
+
+	btnForm := tview.NewForm()
+	btnForm.AddButton("New", func() {
+		ui.pages.RemovePage(pageName)
+		ui.openDBEditModal(nil)
+	})
+	btnForm.AddButton("Edit", func() {
+		if len(items) == 0 {
+			return
+		}
+		row, _ := table.GetSelection()
+		if row < 0 || row >= len(items) {
+			return
+		}
+		item := items[row]
+		ui.pages.RemovePage(pageName)
+		ui.openDBEditModal(&item)
+	})
+	btnForm.AddButton("Delete", func() {
+		if len(items) == 0 {
+			return
+		}
+		row, _ := table.GetSelection()
+		if row < 0 || row >= len(items) {
+			return
+		}
+		manager := newDBManagerState(items)
+		manager.selectAlias(items[row].Alias)
 		ui.deleteDBManager(manager)
 	})
-	form.AddButton("Close", func() {
-		ui.closeModal("db-manager")
+	btnForm.AddButton("Close", closeFn)
+	btnForm.SetButtonsAlign(tview.AlignRight)
+	btnForm.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		switch event.Key() {
+		case tcell.KeyBacktab:
+			if len(items) > 0 {
+				ui.app.SetFocus(table)
+				return nil
+			}
+		case tcell.KeyEsc:
+			closeFn()
+			return nil
+		}
+		return remapFormArrowNavigation(currentFormPrimitive(btnForm), event)
 	})
-	form.SetBorder(true).SetTitle(" DB Aliases ")
-	form.SetButtonsAlign(tview.AlignRight)
-	installFormArrowNavigationWithClose(form, func() { ui.closeModal("db-manager") })
+
+	container := tview.NewFlex().SetDirection(tview.FlexRow)
+	container.SetBorder(true).SetTitle(" DB Aliases ")
+	container.AddItem(table, 0, 1, len(items) > 0)
+	container.AddItem(btnForm, 3, 0, len(items) == 0)
 
 	ui.modalOpen = true
-	ui.pages.AddPage("db-manager", center(76, 12, form), true, true)
+	ui.pages.AddPage(pageName, center(80, 16, container), true, true)
+	if len(items) > 0 {
+		ui.app.SetFocus(table)
+	} else {
+		ui.app.SetFocus(btnForm)
+	}
+}
+
+func (ui *navigatorTUI) openDBEditModal(item *storage.DB) {
+	const pageName = "db-edit"
+	isNew := item == nil
+
+	items, err := ui.dispatcher.dbStore.List()
+	if err != nil {
+		ui.showError(mapStoreError(err))
+		return
+	}
+	manager := newDBManagerState(items)
+
+	var title, aliasValue, baseURLValue, submitLabel string
+	if isNew {
+		title = " New DB Alias "
+		submitLabel = "Add"
+	} else {
+		manager.selectAlias(item.Alias)
+		title = " Edit: " + item.Alias + " "
+		aliasValue = item.Alias
+		baseURLValue = item.BaseURL
+		submitLabel = "Update"
+	}
+
+	backFn := func() {
+		ui.pages.RemovePage(pageName)
+		ui.openDBListModal()
+	}
+
+	form := tview.NewForm()
+	form.AddInputField("alias", aliasValue, 0, nil, nil)
+	form.AddInputField("base url", baseURLValue, 0, nil, nil)
+
+	aliasField := form.GetFormItem(0).(*tview.InputField)
+	baseURLField := form.GetFormItem(1).(*tview.InputField)
+
+	if isNew {
+		aliasField.SetPlaceholder("my-app")
+		baseURLField.SetPlaceholder("https://my-app.pockethost.io")
+	}
+
+	form.AddButton(submitLabel, func() {
+		ui.saveDBManager(manager, aliasField.GetText(), baseURLField.GetText())
+	})
+	form.AddButton("Back", backFn)
+	form.SetBorder(true).SetTitle(title)
+	form.SetButtonsAlign(tview.AlignRight)
+	installFormArrowNavigationWithClose(form, backFn)
+
+	ui.modalOpen = true
+	ui.pages.AddPage(pageName, center(72, 10, form), true, true)
 	ui.app.SetFocus(form)
 }
 
-func (ui *navigatorTUI) openSuperuserManagerModal() {
+func (ui *navigatorTUI) openSuperuserListModal() {
+	const pageName = "superuser-list"
 	dbs, err := ui.dispatcher.dbStore.List()
 	if err != nil {
 		ui.showError(mapStoreError(err))
@@ -1218,57 +1311,171 @@ func (ui *navigatorTUI) openSuperuserManagerModal() {
 		return
 	}
 
-	form := tview.NewForm()
-	form.AddDropDown("db", dbAliasOptions(dbs), manager.selectedDBIndex(), nil)
-	form.AddDropDown("superuser", manager.aliasChoices(), 0, nil)
-	form.AddInputField("alias", "", 0, nil, nil)
-	form.AddInputField("email", "", 0, nil, nil)
-	form.AddPasswordField("password(blank=keep)", "", 0, '*', nil)
+	table := tview.NewTable().SetSelectable(true, false)
+	table.SetBorderPadding(0, 0, 1, 1)
 
-	dbDropdown := form.GetFormItem(0).(*tview.DropDown)
-	superuserDropdown := form.GetFormItem(1).(*tview.DropDown)
-	aliasField := form.GetFormItem(2).(*tview.InputField)
-	emailField := form.GetFormItem(3).(*tview.InputField)
-	passwordField := form.GetFormItem(4).(*tview.InputField)
+	fillSuperuserTable := func() {
+		table.Clear()
+		if len(manager.superusers) == 0 {
+			table.SetCell(0, 0, tview.NewTableCell("No entries yet. Press New to add one."))
+			table.SetSelectable(false, false)
+			return
+		}
+		table.SetSelectable(true, false)
+		for i, su := range manager.superusers {
+			table.SetCell(i, 0, tview.NewTableCell(su.Alias).SetAttributes(tcell.AttrBold).SetExpansion(1).SetMaxWidth(0))
+			table.SetCell(i, 1, tview.NewTableCell(su.Email).SetExpansion(1).SetMaxWidth(0))
+		}
+	}
+	fillSuperuserTable()
 
-	dbDropdown.SetSelectedFunc(func(text string, _ int) {
+	closeFn := func() { ui.closeModal(pageName) }
+
+	table.SetSelectedFunc(func(row, _ int) {
+		if row >= 0 && row < len(manager.superusers) {
+			su := manager.superusers[row]
+			ui.pages.RemovePage(pageName)
+			ui.openSuperuserEditModal(manager.selectedDB, &su)
+		}
+	})
+	table.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		switch event.Key() {
+		case tcell.KeyEsc:
+			closeFn()
+			return nil
+		}
+		return event
+	})
+
+	btnForm := tview.NewForm()
+	btnForm.AddButton("New", func() {
+		ui.pages.RemovePage(pageName)
+		ui.openSuperuserEditModal(manager.selectedDB, nil)
+	})
+	btnForm.AddButton("Edit", func() {
+		if len(manager.superusers) == 0 {
+			return
+		}
+		row, _ := table.GetSelection()
+		if row < 0 || row >= len(manager.superusers) {
+			return
+		}
+		su := manager.superusers[row]
+		ui.pages.RemovePage(pageName)
+		ui.openSuperuserEditModal(manager.selectedDB, &su)
+	})
+	btnForm.AddButton("Delete", func() {
+		if len(manager.superusers) == 0 {
+			return
+		}
+		row, _ := table.GetSelection()
+		if row < 0 || row >= len(manager.superusers) {
+			return
+		}
+		manager.selectAlias(manager.superusers[row].Alias)
+		ui.deleteSuperuserManager(manager)
+	})
+	btnForm.AddButton("Close", closeFn)
+	btnForm.SetButtonsAlign(tview.AlignRight)
+	btnForm.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		switch event.Key() {
+		case tcell.KeyBacktab:
+			ui.app.SetFocus(table)
+			return nil
+		case tcell.KeyEsc:
+			closeFn()
+			return nil
+		}
+		return remapFormArrowNavigation(currentFormPrimitive(btnForm), event)
+	})
+
+	dbForm := tview.NewForm()
+	dbForm.AddDropDown("db", dbAliasOptions(dbs), manager.selectedDBIndex(), func(text string, _ int) {
 		manager.selectedDB = text
 		if err := manager.loadSuperusers(ui.dispatcher); err != nil {
 			ui.showError(err)
 			return
 		}
-		superuserDropdown.SetOptions(manager.aliasChoices(), func(option string, _ int) {
-			applySuperuserFormSelection(&manager, aliasField, emailField, passwordField, option)
-		})
-		superuserDropdown.SetCurrentOption(0)
-		applySuperuserFormSelection(&manager, aliasField, emailField, passwordField, managerNewOption)
+		fillSuperuserTable()
 	})
-	superuserDropdown.SetSelectedFunc(func(text string, _ int) {
-		applySuperuserFormSelection(&manager, aliasField, emailField, passwordField, text)
+	dbForm.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		switch event.Key() {
+		case tcell.KeyEsc:
+			closeFn()
+			return nil
+		}
+		return remapFormArrowNavigation(currentFormPrimitive(dbForm), event)
 	})
-	applySuperuserFormSelection(&manager, aliasField, emailField, passwordField, managerNewOption)
 
-	form.AddButton("Save", func() {
-		ui.saveSuperuserManager(manager, aliasField.GetText(), emailField.GetText(), passwordField.GetText())
-	})
-	form.AddButton("Delete", func() {
-		ui.deleteSuperuserManager(manager)
-	})
-	form.AddButton("Close", func() {
-		ui.closeModal("superuser-manager")
-	})
-	form.SetBorder(true).SetTitle(" Superusers ")
-	form.SetButtonsAlign(tview.AlignRight)
-	installFormArrowNavigationWithClose(form, func() { ui.closeModal("superuser-manager") })
+	container := tview.NewFlex().SetDirection(tview.FlexRow)
+	container.SetBorder(true).SetTitle(" Superusers ")
+	container.AddItem(dbForm, 3, 0, false)
+	container.AddItem(table, 0, 1, true)
+	container.AddItem(btnForm, 3, 0, false)
 
 	ui.modalOpen = true
-	ui.pages.AddPage("superuser-manager", center(80, 14, form), true, true)
+	ui.pages.AddPage(pageName, center(80, 16, container), true, true)
+	ui.app.SetFocus(table)
+}
+
+func (ui *navigatorTUI) openSuperuserEditModal(dbAlias string, item *storage.Superuser) {
+	const pageName = "superuser-edit"
+	isNew := item == nil
+
+	dbs, err := ui.dispatcher.dbStore.List()
+	if err != nil {
+		ui.showError(mapStoreError(err))
+		return
+	}
+	manager := newSuperuserManagerState(dbs, dbAlias)
+	if err := manager.loadSuperusers(ui.dispatcher); err != nil {
+		ui.showError(err)
+		return
+	}
+
+	var title, aliasValue, emailValue, submitLabel string
+	if isNew {
+		title = " New Superuser "
+		submitLabel = "Add"
+	} else {
+		manager.selectAlias(item.Alias)
+		title = " Edit: " + item.Alias + " "
+		aliasValue = item.Alias
+		emailValue = item.Email
+		submitLabel = "Update"
+	}
+
+	backFn := func() {
+		ui.pages.RemovePage(pageName)
+		ui.openSuperuserListModal()
+	}
+
+	form := tview.NewForm()
+	form.AddInputField("alias", aliasValue, 0, nil, nil)
+	form.AddInputField("email", emailValue, 0, nil, nil)
+	form.AddPasswordField("password(blank=keep)", "", 0, '*', nil)
+
+	aliasField := form.GetFormItem(0).(*tview.InputField)
+	emailField := form.GetFormItem(1).(*tview.InputField)
+	passwordField := form.GetFormItem(2).(*tview.InputField)
+
+	form.AddButton(submitLabel, func() {
+		ui.saveSuperuserManager(manager, aliasField.GetText(), emailField.GetText(), passwordField.GetText())
+	})
+	form.AddButton("Back", backFn)
+	form.SetBorder(true).SetTitle(title)
+	form.SetButtonsAlign(tview.AlignRight)
+	installFormArrowNavigationWithClose(form, backFn)
+
+	ui.modalOpen = true
+	ui.pages.AddPage(pageName, center(80, 14, form), true, true)
 	ui.app.SetFocus(form)
 }
 
 func (ui *navigatorTUI) saveDBManager(manager dbManagerState, alias, baseURL string) {
 	previousAlias := manager.selectedAlias
-	ui.closeModal("db-manager")
+	ui.pages.RemovePage("db-edit")
+	ui.closeModal("db-list")
 	if err := manager.save(ui.dispatcher, alias, baseURL); err != nil {
 		ui.showError(err)
 		return
@@ -1279,7 +1486,7 @@ func (ui *navigatorTUI) saveDBManager(manager dbManagerState, alias, baseURL str
 }
 
 func (ui *navigatorTUI) deleteDBManager(manager dbManagerState) {
-	ui.closeModal("db-manager")
+	ui.closeModal("db-list")
 	ui.openConfirmModal("Delete alias '"+manager.selectedAlias+"'?", func() {
 		status := dbDeleteStatus(ui.session.DB.Alias, manager.selectedAlias)
 		if err := manager.remove(ui.dispatcher); err != nil {
@@ -1292,7 +1499,8 @@ func (ui *navigatorTUI) deleteDBManager(manager dbManagerState) {
 
 func (ui *navigatorTUI) saveSuperuserManager(manager superuserManagerState, alias, email, password string) {
 	previousAlias := manager.selectedAlias
-	ui.closeModal("superuser-manager")
+	ui.pages.RemovePage("superuser-edit")
+	ui.closeModal("superuser-list")
 	if err := manager.save(ui.dispatcher, alias, email, password); err != nil {
 		ui.showError(err)
 		return
@@ -1303,7 +1511,7 @@ func (ui *navigatorTUI) saveSuperuserManager(manager superuserManagerState, alia
 }
 
 func (ui *navigatorTUI) deleteSuperuserManager(manager superuserManagerState) {
-	ui.closeModal("superuser-manager")
+	ui.closeModal("superuser-list")
 	ui.openConfirmModal("Delete superuser '"+manager.selectedAlias+"'?", func() {
 		status := superuserDeleteStatus(ui.session, manager.selectedDB, manager.selectedAlias)
 		if err := manager.remove(ui.dispatcher); err != nil {
@@ -1532,30 +1740,32 @@ func (ui *navigatorTUI) updateSessionSuperuser(dbAlias, previousAlias, nextAlias
 	ui.session.SU.Alias = nextAlias
 }
 
-func applyDBFormSelection(manager *dbManagerState, aliasField, baseURLField *tview.InputField, value string) {
-	db, ok := manager.selectAlias(value)
-	if !ok {
-		aliasField.SetText("")
-		baseURLField.SetText("")
-		return
+func buildManagerTable(rows [][]string) *tview.Table {
+	table := tview.NewTable().SetSelectable(true, false)
+	table.SetBorderPadding(0, 0, 1, 1)
+	if len(rows) == 0 {
+		table.SetCell(0, 0, tview.NewTableCell("No entries yet. Press New to add one."))
+		table.SetSelectable(false, false)
+		return table
 	}
-
-	aliasField.SetText(db.Alias)
-	baseURLField.SetText(db.BaseURL)
+	for r, row := range rows {
+		for c, text := range row {
+			cell := tview.NewTableCell(text).SetExpansion(1).SetMaxWidth(0)
+			if c == 0 {
+				cell.SetAttributes(tcell.AttrBold)
+			}
+			table.SetCell(r, c, cell)
+		}
+	}
+	return table
 }
 
-func applySuperuserFormSelection(manager *superuserManagerState, aliasField, emailField, passwordField *tview.InputField, value string) {
-	su, ok := manager.selectAlias(value)
-	if !ok {
-		aliasField.SetText("")
-		emailField.SetText("")
-		passwordField.SetText("")
-		return
+func dbListRows(items []storage.DB) [][]string {
+	rows := make([][]string, len(items))
+	for i, item := range items {
+		rows[i] = []string{item.Alias, item.BaseURL}
 	}
-
-	aliasField.SetText(su.Alias)
-	emailField.SetText(su.Email)
-	passwordField.SetText("")
+	return rows
 }
 
 func center(width, height int, primitive tview.Primitive) tview.Primitive {
@@ -1735,10 +1945,6 @@ func mergeColumns(observed map[string]struct{}, fresh []string) []string {
 	return cols
 }
 
-func dbManagerChoices(items []storage.DB) []string {
-	return append([]string{managerNewOption}, dbAliasOptions(items)...)
-}
-
 func dbAliasOptions(items []storage.DB) []string {
 	out := make([]string, 0, len(items))
 	for _, item := range items {
@@ -1779,10 +1985,6 @@ func (m superuserManagerState) selectedDBIndex() int {
 		return 0
 	}
 	return index
-}
-
-func (m superuserManagerState) aliasChoices() []string {
-	return append([]string{managerNewOption}, superuserAliasOptions(m.superusers)...)
 }
 
 func normalizeManagerSelection(value string) string {

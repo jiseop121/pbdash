@@ -360,13 +360,13 @@ func TestNavigatorTUIHandleKeyManagerShortcutsAndQuit(t *testing.T) {
 
 	handler(tcell.NewEventKey(tcell.KeyRune, 'b', tcell.ModNone), func(tview.Primitive) {})
 	require.True(t, ui.modalOpen)
-	assert.True(t, ui.pages.HasPage("db-manager"))
-	ui.closeModal("db-manager")
+	assert.True(t, ui.pages.HasPage("db-list"))
+	ui.closeModal("db-list")
 
 	handler(tcell.NewEventKey(tcell.KeyRune, 'u', tcell.ModNone), func(tview.Primitive) {})
 	require.True(t, ui.modalOpen)
-	assert.True(t, ui.pages.HasPage("superuser-manager"))
-	ui.closeModal("superuser-manager")
+	assert.True(t, ui.pages.HasPage("superuser-list"))
+	ui.closeModal("superuser-list")
 
 	ui.handleGlobalKey(tcell.NewEventKey(tcell.KeyRune, 'q', tcell.ModNone))
 	assert.True(t, stopped)
