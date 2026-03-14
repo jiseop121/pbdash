@@ -342,6 +342,13 @@ func (ui *navigatorTUI) consumeRuneCommand(key rune) bool {
 		return ui.openRecordsAction(ui.openColumnsModal)
 	case 'y':
 		return ui.copyRecordDetail()
+	case 'd':
+		if ui.screen != screenRecords && ui.screen != screenRecordDetail {
+			ui.detailVisible = !ui.detailVisible
+			ui.renderCurrentScreen()
+			return true
+		}
+		return false
 	case 'b':
 		ui.openDBManagerModal()
 		return true
@@ -1009,11 +1016,11 @@ func (ui *navigatorTUI) breadcrumb() string {
 func (ui *navigatorTUI) helpText() string {
 	switch ui.screen {
 	case screenDBList:
-		return "esc/q quit  j/k move  Enter select  b db aliases  u superusers  r refresh"
+		return "esc/q quit  j/k move  Enter select  d detail  b db aliases  u superusers  r refresh"
 	case screenSuperusers:
-		return "q quit  esc/backspace back  j/k move  Enter select  b db aliases  u superusers  r refresh"
+		return "esc/q quit  esc/backspace back  j/k move  Enter select  d detail  b db aliases  u superusers  r refresh"
 	case screenCollections:
-		return "q quit  esc/backspace back  j/k move  Enter select  b db aliases  u superusers  r refresh"
+		return "esc/q quit  esc/backspace back  j/k move  Enter select  d detail  b db aliases  u superusers  r refresh"
 	case screenRecords:
 		return "q quit  esc/backspace back  j/k move  h/l or <-/-> horiz  / filter  s sort  c columns  b db aliases  u superusers  [/] page  g/G first/last  r refresh  Enter detail"
 	case screenRecordDetail:
