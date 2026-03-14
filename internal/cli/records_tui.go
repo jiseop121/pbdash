@@ -965,6 +965,7 @@ func (ui *navigatorTUI) shiftColumns(delta int) {
 }
 
 func (ui *navigatorTUI) statusText() string {
+	const sep = "  │  "
 	parts := []string{"path=" + ui.breadcrumb()}
 	if ui.hasTarget {
 		parts = append(parts, "db="+ui.target.DB.Alias)
@@ -973,13 +974,8 @@ func (ui *navigatorTUI) statusText() string {
 		}
 	}
 	if ui.screen == screenRecords || ui.screen == screenRecordDetail {
-		parts = append(parts,
-			fmt.Sprintf("collection=%s", ui.recordsState.Collection),
-			fmt.Sprintf("page=%d", ui.recordsState.Page),
-			fmt.Sprintf("perPage=%d", ui.recordsState.PerPage),
-			fmt.Sprintf("totalItems=%d", ui.totalItems),
-			fmt.Sprintf("totalPages=%d", ui.totalPages),
-		)
+		parts = append(parts, fmt.Sprintf("collection=%s", ui.recordsState.Collection))
+		parts = append(parts, fmt.Sprintf("page %d/%d (%d items)", ui.recordsState.Page, ui.totalPages, ui.totalItems))
 		if strings.TrimSpace(ui.recordsState.Filter) != "" {
 			parts = append(parts, fmt.Sprintf("filter=%q", ui.recordsState.Filter))
 		}
@@ -988,9 +984,9 @@ func (ui *navigatorTUI) statusText() string {
 		}
 	}
 	if strings.TrimSpace(ui.statusMessage) != "" {
-		parts = append(parts, "status="+ui.statusMessage)
+		parts = append(parts, ui.statusMessage)
 	}
-	return strings.Join(parts, "  ")
+	return strings.Join(parts, sep)
 }
 
 func (ui *navigatorTUI) breadcrumb() string {
