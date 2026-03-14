@@ -1160,6 +1160,9 @@ func (ui *navigatorTUI) openDBManagerModal() {
 	aliasField := form.GetFormItem(1).(*tview.InputField)
 	baseURLField := form.GetFormItem(2).(*tview.InputField)
 
+	aliasField.SetPlaceholder("my-app")
+	baseURLField.SetPlaceholder("https://my-app.pockethost.io")
+
 	dropdown.SetSelectedFunc(func(text string, _ int) {
 		applyDBFormSelection(&manager, aliasField, baseURLField, text)
 	})
