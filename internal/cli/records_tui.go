@@ -999,7 +999,7 @@ func (ui *navigatorTUI) breadcrumb() string {
 func (ui *navigatorTUI) helpText() string {
 	switch ui.screen {
 	case screenDBList:
-		return "q quit  j/k move  Enter select  b db aliases  u superusers  r refresh"
+		return "esc/q quit  j/k move  Enter select  b db aliases  u superusers  r refresh"
 	case screenSuperusers:
 		return "q quit  esc/backspace back  j/k move  Enter select  b db aliases  u superusers  r refresh"
 	case screenCollections:
