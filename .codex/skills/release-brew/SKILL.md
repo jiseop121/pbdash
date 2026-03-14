@@ -1,9 +1,13 @@
 ---
 name: release-brew
-description: Build and publish macOS Homebrew release artifacts for pbdash, update Formula/pbdash.rb in the same repository, and verify installation. Use when users ask to release a new version, refresh the Homebrew formula SHA/URL, fix brew distribution, or run end-to-end brew delivery checks.
+description: DEPRECATED — GoReleaser CI가 자동 처리하므로 더 이상 사용하지 않는다. `make release-brew`는 deprecated.
 ---
 
-# Release Brew
+# Release Brew (DEPRECATED)
+
+> **이 스킬은 더 이상 사용하지 않는다.**
+> Homebrew Formula 갱신은 태그 푸시 후 GoReleaser CI(`.github/workflows/release.yml`)가 자동 처리한다.
+> 릴리스 절차는 `docs/reference/development/release.md`를 참고한다.
 
 ## Workflow
 

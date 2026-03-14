@@ -16,27 +16,27 @@
 
 ## 문서 인덱스
 - 문서 루트는 `docs/`입니다.
-- `docs/development`는 개발 절차, 실행 방법, 외부 의존성 사용 맥락을 담습니다.
-- `docs/specs`는 구현 명세, 기능 계약, 동작 기준 문서를 담습니다.
-- `docs/internal`는 내부 협업용 문서를 담습니다.
-- `docs/internal`는 Git 추적 대상이 아니므로, 내부 문서에만 의존하는 공개 규칙을 만들지 않습니다.
+- `docs/memory.md`: 프로젝트 전역 작업 메모리 (현재 상태, 불변 규칙, 문서 탐색 요약)
+- `docs/reference/`: 재사용 가능한 참조 문서 (개발 절차, 의존성 가이드, 구현 명세)
+- `docs/tasks/`: 작업별 작업 공간 (`yyyy/mm-dd/<task-slug>/`)
+- `docs/internal`는 내부 협업용 문서입니다. Git 추적 대상이 아니므로, 내부 문서에만 의존하는 공개 규칙을 만들지 않습니다.
 
 ## 문서 탐색 규칙
-- 개발 환경, 테스트, 실행 방법이 필요하면 먼저 `docs/development/development-guide.md`를 봅니다.
-- 외부 라이브러리 사용 이유나 수정 영향 범위를 확인할 때는 `docs/development/dependencies/README.md`를 먼저 봅니다.
-- PocketBase SDK 동작을 수정하거나 인증/조회 흐름을 건드릴 때는 `docs/development/dependencies/pocketbase-client.md`를 우선 확인합니다.
-- CLI/TUI/UI 동작 기준이나 구현 범위를 확인할 때는 `docs/specs` 아래 문서를 먼저 봅니다.
+- 개발 환경, 테스트, 실행 방법이 필요하면 먼저 `docs/reference/development/setup.md`를 봅니다.
+- 외부 라이브러리 사용 이유나 수정 영향 범위를 확인할 때는 `docs/reference/dependencies/overview.md`를 먼저 봅니다.
+- PocketBase SDK 동작을 수정하거나 인증/조회 흐름을 건드릴 때는 `docs/reference/dependencies/pocketbase-client.md`를 우선 확인합니다.
+- CLI/TUI/UI 동작 기준이나 구현 범위를 확인할 때는 `docs/reference/specs/` 아래 문서를 먼저 봅니다.
 - 내부 체크리스트나 기획 전달 메모가 필요할 때만 `docs/internal`을 참고합니다.
 - 문서와 코드가 충돌하면, 실제 구현과 테스트를 우선 확인한 뒤 필요한 문서를 함께 갱신합니다.
-- 새 문서를 추가할 때는 먼저 공개 문서인지 내부 문서인지 판단한 뒤 `development`, `specs`, `internal` 중 하나에만 둡니다.
+- 새 참조 문서를 추가할 때는 `docs/reference/` 아래 적절한 하위 디렉터리에 둡니다.
 
 ## 작업별 추천 문서
-- 릴리스, 버전 정책, brew 배포 작업: 이 문서의 릴리스 섹션과 `docs/development/release-guide.md`를 먼저 확인합니다.
-- 로컬 개발, 테스트, E2E 검증: `docs/development/development-guide.md`
-- 외부 의존성 수정: `docs/development/dependencies/README.md`
-- PocketBase SDK 수정: `docs/development/dependencies/pocketbase-client.md`
-- CLI 핵심 동작 및 Track 1 구현 기준: `docs/specs/cli-core-implementation-spec.md`
-- `-ui` 관련 Track 2 기준: `docs/specs/ui-mode-dev-spec.md`
+- 릴리스, 버전 정책, brew 배포 작업: 이 문서의 릴리스 섹션과 `docs/reference/development/release.md`를 먼저 확인합니다.
+- 로컬 개발, 테스트, E2E 검증: `docs/reference/development/setup.md`
+- 외부 의존성 수정: `docs/reference/dependencies/overview.md`
+- PocketBase SDK 수정: `docs/reference/dependencies/pocketbase-client.md`
+- CLI 핵심 동작 및 Track 1 구현 기준: `docs/reference/specs/cli-core.md`
+- `-ui` 관련 Track 2 기준: `docs/reference/specs/ui-mode.md`
 - 내부 기획 점검 맥락: `docs/internal/pm-review-checklist.md`
 
 ## 작업 원칙
