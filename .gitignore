@@ -2,5 +2,6 @@
 .tmp/
 docs/internal/
 pbdash
+main
 preview/
 styles/

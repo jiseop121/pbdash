@@ -339,37 +339,354 @@ func TestRemapSubmitCancelNavigationPreservesSpaceAndArrowKeys(t *testing.T) {
 	require.Equal(t, tcell.KeyBacktab, left.Key())
 }
 
-func TestNavigatorTUIHandleKeyManagerShortcutsAndQuit(t *testing.T) {
-	dispatcher := NewDispatcher(DispatcherConfig{Stdout: bytes.NewBuffer(nil), Version: "test", DataDir: t.TempDir()})
-	_, err := dispatcher.saveDBAlias("dev", "http://127.0.0.1:8090")
-	require.NoError(t, err)
-
-	ui := newTestNavigatorTUI()
+func TestScreenDBListBKey(t *testing.T) {
+	dispatcher := newTestDispatcherWithDB(t, "dev", "http://127.0.0.1:8090")
+	ui := newTestNavigatorTUIOnScreen(screenDBList)
 	ui.dispatcher = dispatcher
-	ui.screen = screenDBList
 	ui.dbs = []storage.DB{{Alias: "dev", BaseURL: "http://127.0.0.1:8090"}}
-
-	stopped := false
-	ui.stop = func() {
-		stopped = true
-	}
-
 	ui.setupViews()
-	handler := ui.tableView.InputHandler()
-	require.NotNil(t, handler)
 
-	handler(tcell.NewEventKey(tcell.KeyRune, 'b', tcell.ModNone), func(tview.Primitive) {})
-	require.True(t, ui.modalOpen)
-	assert.True(t, ui.pages.HasPage("db-manager"))
-	ui.closeModal("db-manager")
+	// 'b' should be a no-op on screenDBList (no duplicate db-list modal)
+	result := ui.consumeRuneCommand('b')
 
-	handler(tcell.NewEventKey(tcell.KeyRune, 'u', tcell.ModNone), func(tview.Primitive) {})
-	require.True(t, ui.modalOpen)
-	assert.True(t, ui.pages.HasPage("superuser-manager"))
-	ui.closeModal("superuser-manager")
+	assert.False(t, result)
+	assert.False(t, ui.modalOpen)
+	assert.False(t, ui.pages.HasPage("db-list"))
+}
+
+func TestScreenDBListQKey(t *testing.T) {
+	ui := newTestNavigatorTUIOnScreen(screenDBList)
+	stopped := false
+	ui.stop = func() { stopped = true }
+	ui.setupViews()
 
 	ui.handleGlobalKey(tcell.NewEventKey(tcell.KeyRune, 'q', tcell.ModNone))
+
 	assert.True(t, stopped)
+}
+
+// ── consumeGlobalKey: Esc on screenDBList ────────────────────────────────────
+
+func TestConsumeGlobalKeyEscOnDBListIsIgnored(t *testing.T) {
+	keys := []tcell.Key{tcell.KeyEsc, tcell.KeyBackspace, tcell.KeyBackspace2}
+	for _, key := range keys {
+		stopped := false
+		ui := &navigatorTUI{screen: screenDBList, stop: func() { stopped = true }}
+
+		consumed := ui.consumeGlobalKey(tcell.NewEventKey(key, 0, tcell.ModNone))
+
+		assert.True(t, consumed, "key %v should be consumed", key)
+		assert.False(t, stopped, "key %v should not stop app on screenDBList", key)
+		assert.Equal(t, screenDBList, ui.screen)
+	}
+}
+
+func TestConsumeGlobalKeyEscGoesBackOnNonDBList(t *testing.T) {
+	ui := newTestNavigatorTUI()
+	ui.setupViews()
+	ui.screen = screenDBList
+	ui.pushScreen(screenCollections) // history=[screenDBList], screen=screenCollections
+
+	consumed := ui.consumeGlobalKey(tcell.NewEventKey(tcell.KeyEsc, 0, tcell.ModNone))
+
+	require.True(t, consumed)
+	assert.Equal(t, screenDBList, ui.screen)
+}
+
+// ── shouldShowDetailPane ─────────────────────────────────────────────────────
+
+func TestShouldShowDetailPane(t *testing.T) {
+	tests := []struct {
+		screen        navigatorScreen
+		detailVisible bool
+		want          bool
+	}{
+		{screenDBList, true, false},
+		{screenSuperusers, true, false},
+		{screenCollections, true, true},
+		{screenCollections, false, false},
+		{screenRecords, true, false},
+		{screenRecordDetail, true, false},
+	}
+	for _, tt := range tests {
+		t.Run(string(tt.screen), func(t *testing.T) {
+			ui := &navigatorTUI{screen: tt.screen, detailVisible: tt.detailVisible}
+			assert.Equal(t, tt.want, ui.shouldShowDetailPane())
+		})
+	}
+}
+
+// ── consumeRuneCommand: d key ────────────────────────────────────────────────
+
+func TestConsumeRuneCommandDKey(t *testing.T) {
+	tests := []struct {
+		name           string
+		screen         navigatorScreen
+		initialVisible bool
+		wantConsumed   bool
+		wantVisible    bool
+	}{
+		{"dbList/ignored", screenDBList, true, false, true},
+		{"superusers/ignored", screenSuperusers, false, false, false},
+		{"records/ignored", screenRecords, true, false, true},
+		{"recordDetail/ignored", screenRecordDetail, true, false, true},
+		{"collections/toggle-on", screenCollections, false, true, true},
+		{"collections/toggle-off", screenCollections, true, true, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ui := newTestNavigatorTUI()
+			ui.screen = tt.screen
+			ui.detailVisible = tt.initialVisible
+			ui.setupViews()
+
+			got := ui.consumeRuneCommand('d')
+
+			assert.Equal(t, tt.wantConsumed, got)
+			assert.Equal(t, tt.wantVisible, ui.detailVisible)
+		})
+	}
+}
+
+// ── consumeRuneCommand: u key ────────────────────────────────────────────────
+
+func TestConsumeRuneCommandUKey(t *testing.T) {
+	tests := []struct {
+		name          string
+		screen        navigatorScreen
+		dbs           []storage.DB
+		wantConsumed  bool
+		wantModalPage string
+	}{
+		{
+			name:          "dbList/with-db/opens-superuser-list",
+			screen:        screenDBList,
+			dbs:           []storage.DB{{Alias: "dev", BaseURL: "http://127.0.0.1:8090"}},
+			wantConsumed:  true,
+			wantModalPage: "superuser-list",
+		},
+		{
+			name:         "dbList/no-dbs/ignored",
+			screen:       screenDBList,
+			dbs:          nil,
+			wantConsumed: false,
+		},
+		{
+			name:         "superusers/ignored",
+			screen:       screenSuperusers,
+			dbs:          []storage.DB{{Alias: "dev", BaseURL: "http://127.0.0.1:8090"}},
+			wantConsumed: false,
+		},
+		{
+			name:          "collections/opens-superuser-list",
+			screen:        screenCollections,
+			dbs:           []storage.DB{{Alias: "dev", BaseURL: "http://127.0.0.1:8090"}},
+			wantConsumed:  true,
+			wantModalPage: "superuser-list",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dispatcher := NewDispatcher(DispatcherConfig{Stdout: bytes.NewBuffer(nil), Version: "test", DataDir: t.TempDir()})
+			for _, db := range tt.dbs {
+				_, err := dispatcher.saveDBAlias(db.Alias, db.BaseURL)
+				require.NoError(t, err)
+			}
+			ui := newTestNavigatorTUIOnScreen(tt.screen)
+			ui.dispatcher = dispatcher
+			ui.dbs = tt.dbs
+			ui.setupViews()
+
+			got := ui.consumeRuneCommand('u')
+
+			assert.Equal(t, tt.wantConsumed, got)
+			if tt.wantModalPage != "" {
+				assert.True(t, ui.modalOpen)
+				assert.True(t, ui.pages.HasPage(tt.wantModalPage))
+			} else {
+				assert.False(t, ui.modalOpen)
+			}
+		})
+	}
+}
+
+// ── consumeRuneCommand: n/e/D on screenDBList ─────────────────────────────────
+
+func TestConsumeRuneCommandInlineDBListCRUD(t *testing.T) {
+	tests := []struct {
+		name          string
+		key           rune
+		dbs           []storage.DB
+		wantConsumed  bool
+		wantModalPage string
+	}{
+		{
+			name:          "n/opens-db-edit",
+			key:           'n',
+			wantConsumed:  true,
+			wantModalPage: "db-edit",
+		},
+		{
+			name:          "e/with-db/opens-db-edit",
+			key:           'e',
+			dbs:           []storage.DB{{Alias: "dev", BaseURL: "http://127.0.0.1:8090"}},
+			wantConsumed:  true,
+			wantModalPage: "db-edit",
+		},
+		{
+			name:         "e/no-db/ignored",
+			key:          'e',
+			wantConsumed: false,
+		},
+		{
+			name:          "D/with-db/opens-confirm",
+			key:           'D',
+			dbs:           []storage.DB{{Alias: "dev", BaseURL: "http://127.0.0.1:8090"}},
+			wantConsumed:  true,
+			wantModalPage: "confirm",
+		},
+		{
+			name:         "D/no-db/ignored",
+			key:          'D',
+			wantConsumed: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dispatcher := newTestDispatcherWithDBs(t, tt.dbs)
+			ui := newTestNavigatorTUIOnScreen(screenDBList)
+			ui.dispatcher = dispatcher
+			ui.dbs = tt.dbs
+			ui.setupViews()
+
+			got := ui.consumeRuneCommand(tt.key)
+
+			assert.Equal(t, tt.wantConsumed, got)
+			if tt.wantModalPage != "" {
+				assert.True(t, ui.modalOpen)
+				assert.True(t, ui.pages.HasPage(tt.wantModalPage))
+			} else {
+				assert.False(t, ui.modalOpen)
+			}
+		})
+	}
+}
+
+// ── consumeRuneCommand: n/e/D on screenSuperusers ────────────────────────────
+
+func TestConsumeRuneCommandInlineSuperusersCRUD(t *testing.T) {
+	tests := []struct {
+		name          string
+		key           rune
+		superusers    []storage.Superuser
+		wantConsumed  bool
+		wantModalPage string
+	}{
+		{
+			name:          "n/opens-superuser-edit",
+			key:           'n',
+			wantConsumed:  true,
+			wantModalPage: "superuser-edit",
+		},
+		{
+			name:          "e/with-su/opens-superuser-edit",
+			key:           'e',
+			superusers:    []storage.Superuser{{DBAlias: "dev", Alias: "root", Email: "root@example.com"}},
+			wantConsumed:  true,
+			wantModalPage: "superuser-edit",
+		},
+		{
+			name:         "e/no-su/ignored",
+			key:          'e',
+			wantConsumed: false,
+		},
+		{
+			name:          "D/with-su/opens-confirm",
+			key:           'D',
+			superusers:    []storage.Superuser{{DBAlias: "dev", Alias: "root", Email: "root@example.com"}},
+			wantConsumed:  true,
+			wantModalPage: "confirm",
+		},
+		{
+			name:         "D/no-su/ignored",
+			key:          'D',
+			wantConsumed: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dispatcher := newTestDispatcherWithDB(t, "dev", "http://127.0.0.1:8090")
+			ui := newTestNavigatorTUIOnScreen(screenSuperusers)
+			ui.dispatcher = dispatcher
+			ui.hasSession = true
+			ui.session = pbSession{DB: storage.DB{Alias: "dev", BaseURL: "http://127.0.0.1:8090"}}
+			ui.dbs = []storage.DB{{Alias: "dev", BaseURL: "http://127.0.0.1:8090"}}
+			ui.superusers = tt.superusers
+			ui.setupViews()
+
+			got := ui.consumeRuneCommand(tt.key)
+
+			assert.Equal(t, tt.wantConsumed, got)
+			if tt.wantModalPage != "" {
+				assert.True(t, ui.modalOpen)
+				assert.True(t, ui.pages.HasPage(tt.wantModalPage))
+			} else {
+				assert.False(t, ui.modalOpen)
+			}
+		})
+	}
+}
+
+// ── helpText ─────────────────────────────────────────────────────────────────
+
+func TestHelpText(t *testing.T) {
+	tests := []struct {
+		screen navigatorScreen
+		want   string
+	}{
+		{screenDBList, "q quit  Enter select  n new  e edit  D del  u superusers  r refresh"},
+		{screenSuperusers, "q quit  esc/backspace back  Enter select  n new  e edit  D del  b db aliases  r refresh"},
+	}
+	for _, tt := range tests {
+		t.Run(string(tt.screen), func(t *testing.T) {
+			ui := &navigatorTUI{screen: tt.screen}
+			assert.Equal(t, tt.want, ui.helpText())
+		})
+	}
+}
+
+// ── emptyDetailText ──────────────────────────────────────────────────────────
+
+func TestEmptyDetailText(t *testing.T) {
+	tests := []struct {
+		name    string
+		screen  navigatorScreen
+		session pbSession
+		want    string
+	}{
+		{
+			name:   "dbList",
+			screen: screenDBList,
+			want:   "No DB aliases configured. Press [n[] to add one.",
+		},
+		{
+			name:    "superusers/with-db",
+			screen:  screenSuperusers,
+			session: pbSession{DB: storage.DB{Alias: "dev"}},
+			want:    "No superusers for 'dev'. Press [n[] to add one.",
+		},
+		{
+			name:   "superusers/no-session",
+			screen: screenSuperusers,
+			want:   "No superusers. Press [n[] to add one.",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ui := &navigatorTUI{screen: tt.screen, session: tt.session}
+			assert.Equal(t, tt.want, ui.emptyDetailText())
+		})
+	}
 }
 
 func TestDBManagerStateSelectAlias(t *testing.T) {
@@ -508,6 +825,30 @@ func TestSuperuserManagerStateRemoveRequiresSelection(t *testing.T) {
 	assert.Contains(t, err.Error(), "Select an existing superuser first")
 }
 
+func newTestNavigatorTUIOnScreen(screen navigatorScreen) *navigatorTUI {
+	ui := newTestNavigatorTUI()
+	ui.screen = screen
+	return ui
+}
+
+func newTestDispatcherWithDB(t *testing.T, alias, baseURL string) *Dispatcher {
+	t.Helper()
+	dispatcher := NewDispatcher(DispatcherConfig{Stdout: bytes.NewBuffer(nil), Version: "test", DataDir: t.TempDir()})
+	_, err := dispatcher.saveDBAlias(alias, baseURL)
+	require.NoError(t, err)
+	return dispatcher
+}
+
+func newTestDispatcherWithDBs(t *testing.T, dbs []storage.DB) *Dispatcher {
+	t.Helper()
+	dispatcher := NewDispatcher(DispatcherConfig{Stdout: bytes.NewBuffer(nil), Version: "test", DataDir: t.TempDir()})
+	for _, db := range dbs {
+		_, err := dispatcher.saveDBAlias(db.Alias, db.BaseURL)
+		require.NoError(t, err)
+	}
+	return dispatcher
+}
+
 func newTestNavigatorTUI() *navigatorTUI {
 	return &navigatorTUI{
 		app:           tview.NewApplication(),
@@ -531,7 +872,7 @@ func TestOpenConfirmModalConfirmCallsOnConfirm(t *testing.T) {
 	ui.pages = tview.NewPages().AddPage("main", tview.NewBox(), true, true)
 
 	called := false
-	ui.openConfirmModal("Delete this?", func() { called = true })
+	ui.openConfirmModal("Delete this?", func() { called = true }, nil)
 
 	require.True(t, ui.modalOpen)
 	require.True(t, ui.pages.HasPage("confirm"))
@@ -549,7 +890,7 @@ func TestOpenConfirmModalCancelDoesNotCallOnConfirm(t *testing.T) {
 	ui.pages = tview.NewPages().AddPage("main", tview.NewBox(), true, true)
 
 	called := false
-	ui.openConfirmModal("Delete this?", func() { called = true })
+	ui.openConfirmModal("Delete this?", func() { called = true }, nil)
 
 	// simulate Cancel: close modal without calling onConfirm
 	ui.pages.RemovePage("confirm")
