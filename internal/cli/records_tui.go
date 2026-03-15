@@ -1205,6 +1205,7 @@ func (ui *navigatorTUI) openDBListModal() {
 
 	table := buildManagerTable(dbListRows(items))
 	closeFn := func() { ui.closeModal(pageName) }
+	var btnForm *tview.Form
 
 	table.SetSelectedFunc(func(row, _ int) {
 		if row >= 0 && row < len(items) {
@@ -1221,11 +1222,50 @@ func (ui *navigatorTUI) openDBListModal() {
 		case tcell.KeyEsc:
 			closeFn()
 			return nil
+		case tcell.KeyTab:
+			ui.app.SetFocus(btnForm)
+			return nil
+		}
+		switch event.Rune() {
+		case 'n':
+			ui.pages.RemovePage(pageName)
+			ui.openDBEditModal(nil, func() {
+				ui.pages.RemovePage("db-edit")
+				ui.openDBListModal()
+			})
+			return nil
+		case 'e':
+			if len(items) == 0 {
+				return nil
+			}
+			row, _ := table.GetSelection()
+			if row < 0 || row >= len(items) {
+				return nil
+			}
+			item := items[row]
+			ui.pages.RemovePage(pageName)
+			ui.openDBEditModal(&item, func() {
+				ui.pages.RemovePage("db-edit")
+				ui.openDBListModal()
+			})
+			return nil
+		case 'D':
+			if len(items) == 0 {
+				return nil
+			}
+			row, _ := table.GetSelection()
+			if row < 0 || row >= len(items) {
+				return nil
+			}
+			manager := newDBManagerState(items)
+			manager.selectAlias(items[row].Alias)
+			ui.deleteDBManager(manager, func() { ui.openDBListModal() })
+			return nil
 		}
 		return event
 	})
 
-	btnForm := tview.NewForm()
+	btnForm = tview.NewForm()
 	btnForm.AddButton("New", func() {
 		ui.pages.RemovePage(pageName)
 		ui.openDBEditModal(nil, func() {

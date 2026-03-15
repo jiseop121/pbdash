@@ -667,18 +667,18 @@ func TestEmptyDetailText(t *testing.T) {
 		{
 			name:   "dbList",
 			screen: screenDBList,
-			want:   "No DB aliases configured. Press [n] to add one.",
+			want:   "No DB aliases configured. Press [n[] to add one.",
 		},
 		{
 			name:    "superusers/with-db",
 			screen:  screenSuperusers,
 			session: pbSession{DB: storage.DB{Alias: "dev"}},
-			want:    "No superusers for 'dev'. Press [n] to add one.",
+			want:    "No superusers for 'dev'. Press [n[] to add one.",
 		},
 		{
 			name:   "superusers/no-session",
 			screen: screenSuperusers,
-			want:   "No superusers. Press [n] to add one.",
+			want:   "No superusers. Press [n[] to add one.",
 		},
 	}
 	for _, tt := range tests {
