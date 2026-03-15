@@ -1632,13 +1632,13 @@ func (ui *navigatorTUI) openConfirmModal(message string, onConfirm func(), onCan
 			onCancel()
 		}
 	})
-	form.SetBorder(true).SetTitle(" Confirm ")
 	form.SetButtonsAlign(tview.AlignCenter)
 
-	text := tview.NewTextView().SetText(message).SetTextAlign(tview.AlignCenter)
+	fullMessage := message + "\n\n[Enter] confirm   [Esc] cancel"
+	text := tview.NewTextView().SetText(fullMessage).SetTextAlign(tview.AlignCenter)
 	container := tview.NewFlex().SetDirection(tview.FlexRow)
 	container.AddItem(text, 0, 1, false)
-	container.AddItem(form, 3, 0, true)
+	container.AddItem(form, 1, 0, true)
 
 	installFormArrowNavigationWithClose(form, func() {
 		ui.closeModal(pageName)
