@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0] - 2026-03-15
+
+### Added
+- New 2-phase modal UI for DB alias and Superuser management:
+  open a list view first, then edit inline without leaving the screen.
+- Keyboard shortcuts `n` (new), `e` (edit), `D` (delete) available
+  directly from DB alias and Superuser list modals.
+- `Tab` toggles focus between the DB dropdown and the superuser table
+  in the Superuser modal.
+
+### Changed
+- `Esc`/`Backspace` on the DB list screen no longer exits the app.
+- Removed `j`/`k` navigation aliases; use arrow keys.
+- `b`/`u`/`n`/`e`/`D` keys are now scoped per screen to avoid conflicts.
+- Confirm modal no longer shows a redundant border/title;
+  `[Enter]`/`[Esc]` hint is displayed inline in the message.
+
 ## [0.6.0] - 2026-03-12
 
 ### Added
