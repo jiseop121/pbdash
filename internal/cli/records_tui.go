@@ -294,6 +294,9 @@ func (ui *navigatorTUI) openSortModal() {
 func (ui *navigatorTUI) consumeGlobalKey(event *tcell.EventKey) bool {
 	switch event.Key() {
 	case tcell.KeyEsc, tcell.KeyBackspace, tcell.KeyBackspace2:
+		if ui.screen == screenDBList {
+			return true // 첫 화면에서 실수로 종료되는 것 방지
+		}
 		ui.goBack()
 		return true
 	}
@@ -321,12 +324,6 @@ func (ui *navigatorTUI) consumeNavigationKey(key tcell.Key) bool {
 
 func (ui *navigatorTUI) consumeRuneCommand(key rune) bool {
 	switch key {
-	case 'j':
-		ui.moveSelection(1)
-		return true
-	case 'k':
-		ui.moveSelection(-1)
-		return true
 	case 'h':
 		return ui.shiftRecordsColumns(-1)
 	case 'l':
@@ -340,18 +337,72 @@ func (ui *navigatorTUI) consumeRuneCommand(key rune) bool {
 	case 'y':
 		return ui.copyRecordDetail()
 	case 'd':
-		if ui.screen != screenRecords && ui.screen != screenRecordDetail {
-			ui.detailVisible = !ui.detailVisible
-			ui.renderCurrentScreen()
-			return true
+		if ui.screen == screenRecords || ui.screen == screenRecordDetail ||
+			ui.screen == screenDBList || ui.screen == screenSuperusers {
+			return false
 		}
-		return false
+		ui.detailVisible = !ui.detailVisible
+		ui.renderCurrentScreen()
+		return true
 	case 'b':
+		if ui.screen == screenDBList {
+			return false
+		}
 		ui.openDBListModal()
 		return true
 	case 'u':
+		if ui.screen == screenSuperusers {
+			return false
+		}
+		if ui.screen == screenDBList {
+			if len(ui.dbs) == 0 {
+				return false
+			}
+			db := ui.dbs[ui.selectedIndex]
+			ui.openSuperuserListModalForDB(db.Alias)
+			return true
+		}
 		ui.openSuperuserListModal()
 		return true
+	case 'n':
+		if ui.screen == screenDBList {
+			ui.openDBEditModal(nil, func() { ui.closeModal("db-edit") })
+			return true
+		}
+		if ui.screen == screenSuperusers {
+			ui.openSuperuserEditModal(ui.session.DB.Alias, nil,
+				func() { ui.closeModal("superuser-edit") })
+			return true
+		}
+		return false
+	case 'e':
+		if ui.screen == screenDBList && len(ui.dbs) > 0 {
+			db := ui.dbs[ui.selectedIndex]
+			ui.openDBEditModal(&db, func() { ui.closeModal("db-edit") })
+			return true
+		}
+		if ui.screen == screenSuperusers && len(ui.superusers) > 0 {
+			su := ui.superusers[ui.selectedIndex]
+			ui.openSuperuserEditModal(ui.session.DB.Alias, &su,
+				func() { ui.closeModal("superuser-edit") })
+			return true
+		}
+		return false
+	case 'D':
+		if ui.screen == screenDBList && len(ui.dbs) > 0 {
+			manager := newDBManagerState(ui.dbs)
+			manager.selectAlias(ui.dbs[ui.selectedIndex].Alias)
+			ui.deleteDBManager(manager, nil)
+			return true
+		}
+		if ui.screen == screenSuperusers && len(ui.superusers) > 0 {
+			manager := newSuperuserManagerState(ui.dbs, ui.session.DB.Alias)
+			manager.superusers = ui.superusers
+			manager.selectAlias(ui.superusers[ui.selectedIndex].Alias)
+			ui.deleteSuperuserManager(manager, nil)
+			return true
+		}
+		return false
 	case 'r':
 		if ui.isRecordDetailScreen() {
 			return false
@@ -911,9 +962,13 @@ func (ui *navigatorTUI) emptyTableMessage() string {
 func (ui *navigatorTUI) emptyDetailText() string {
 	switch ui.screen {
 	case screenDBList:
-		return "No saved db aliases"
+		return "No DB aliases configured. Press [n] to add one."
 	case screenSuperusers:
-		return "No superusers"
+		db := strings.TrimSpace(ui.session.DB.Alias)
+		if db == "" {
+			return "No superusers. Press [n] to add one."
+		}
+		return "No superusers for '" + db + "'. Press [n] to add one."
 	case screenCollections:
 		return "No collections"
 	case screenRecords:
@@ -925,24 +980,6 @@ func (ui *navigatorTUI) emptyDetailText() string {
 	}
 }
 
-func (ui *navigatorTUI) moveSelection(delta int) {
-	rows := ui.currentRows()
-	if len(rows) == 0 {
-		return
-	}
-	next := ui.selectedIndex + delta
-	if next < 0 {
-		next = 0
-	}
-	if next >= len(rows) {
-		next = len(rows) - 1
-	}
-	ui.selectedIndex = next
-	ui.tableView.Select(ui.selectedIndex+1, 0)
-	if ui.shouldShowDetailPane() {
-		ui.renderDetail()
-	}
-}
 
 func (ui *navigatorTUI) shiftColumns(delta int) {
 	if ui.screen != screenRecords || delta == 0 {
@@ -1020,13 +1057,13 @@ func (ui *navigatorTUI) breadcrumb() string {
 func (ui *navigatorTUI) helpText() string {
 	switch ui.screen {
 	case screenDBList:
-		return "esc/q quit  j/k move  Enter select  d detail  b db aliases  u superusers  r refresh"
+		return "q quit  Enter select  n new  e edit  D del  u superusers  r refresh"
 	case screenSuperusers:
-		return "q quit  esc/backspace back  j/k move  Enter select  d detail  b db aliases  u superusers  r refresh"
+		return "q quit  esc/backspace back  Enter select  n new  e edit  D del  b db aliases  r refresh"
 	case screenCollections:
-		return "q quit  esc/backspace back  j/k move  Enter select  d detail  b db aliases  u superusers  r refresh"
+		return "q quit  esc/backspace back  Enter select  d detail  b db aliases  u superusers  r refresh"
 	case screenRecords:
-		return "q quit  esc/backspace back  j/k move  h/l or <-/-> horiz  / filter  s sort  c columns  b db aliases  u superusers  [/] page  g/G first/last  r refresh  Enter detail"
+		return "q quit  esc/backspace back  h/l or <-/-> horiz  / filter  s sort  c columns  b db aliases  u superusers  [/] page  g/G first/last  r refresh  Enter detail"
 	case screenRecordDetail:
 		return "q quit  esc/backspace back  y copy  b db aliases  u superusers"
 	default:
@@ -1052,7 +1089,11 @@ func (ui *navigatorTUI) detailTitle() string {
 }
 
 func (ui *navigatorTUI) shouldShowDetailPane() bool {
-	return ui.screen != screenRecords && ui.screen != screenRecordDetail && ui.detailVisible
+	return ui.screen != screenDBList &&
+		ui.screen != screenSuperusers &&
+		ui.screen != screenRecords &&
+		ui.screen != screenRecordDetail &&
+		ui.detailVisible
 }
 
 func (ui *navigatorTUI) openInputModal(title, label, current string, apply func(string) error) {
@@ -1169,7 +1210,10 @@ func (ui *navigatorTUI) openDBListModal() {
 		if row >= 0 && row < len(items) {
 			item := items[row]
 			ui.pages.RemovePage(pageName)
-			ui.openDBEditModal(&item)
+			ui.openDBEditModal(&item, func() {
+				ui.pages.RemovePage("db-edit")
+				ui.openDBListModal()
+			})
 		}
 	})
 	table.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
@@ -1184,7 +1228,10 @@ func (ui *navigatorTUI) openDBListModal() {
 	btnForm := tview.NewForm()
 	btnForm.AddButton("New", func() {
 		ui.pages.RemovePage(pageName)
-		ui.openDBEditModal(nil)
+		ui.openDBEditModal(nil, func() {
+			ui.pages.RemovePage("db-edit")
+			ui.openDBListModal()
+		})
 	})
 	btnForm.AddButton("Edit", func() {
 		if len(items) == 0 {
@@ -1196,7 +1243,10 @@ func (ui *navigatorTUI) openDBListModal() {
 		}
 		item := items[row]
 		ui.pages.RemovePage(pageName)
-		ui.openDBEditModal(&item)
+		ui.openDBEditModal(&item, func() {
+			ui.pages.RemovePage("db-edit")
+			ui.openDBListModal()
+		})
 	})
 	btnForm.AddButton("Delete", func() {
 		if len(items) == 0 {
@@ -1208,7 +1258,7 @@ func (ui *navigatorTUI) openDBListModal() {
 		}
 		manager := newDBManagerState(items)
 		manager.selectAlias(items[row].Alias)
-		ui.deleteDBManager(manager)
+		ui.deleteDBManager(manager, func() { ui.openDBListModal() })
 	})
 	btnForm.AddButton("Close", closeFn)
 	btnForm.SetButtonsAlign(tview.AlignRight)
@@ -1240,7 +1290,7 @@ func (ui *navigatorTUI) openDBListModal() {
 	}
 }
 
-func (ui *navigatorTUI) openDBEditModal(item *storage.DB) {
+func (ui *navigatorTUI) openDBEditModal(item *storage.DB, onBack func()) {
 	const pageName = "db-edit"
 	isNew := item == nil
 
@@ -1265,7 +1315,7 @@ func (ui *navigatorTUI) openDBEditModal(item *storage.DB) {
 
 	backFn := func() {
 		ui.pages.RemovePage(pageName)
-		ui.openDBListModal()
+		onBack()
 	}
 
 	form := tview.NewForm()
@@ -1294,6 +1344,10 @@ func (ui *navigatorTUI) openDBEditModal(item *storage.DB) {
 }
 
 func (ui *navigatorTUI) openSuperuserListModal() {
+	ui.openSuperuserListModalForDB(ui.session.DB.Alias)
+}
+
+func (ui *navigatorTUI) openSuperuserListModalForDB(initialDB string) {
 	const pageName = "superuser-list"
 	dbs, err := ui.dispatcher.dbStore.List()
 	if err != nil {
@@ -1305,7 +1359,7 @@ func (ui *navigatorTUI) openSuperuserListModal() {
 		return
 	}
 
-	manager := newSuperuserManagerState(dbs, ui.session.DB.Alias)
+	manager := newSuperuserManagerState(dbs, initialDB)
 	if err := manager.loadSuperusers(ui.dispatcher); err != nil {
 		ui.showError(err)
 		return
@@ -1331,12 +1385,20 @@ func (ui *navigatorTUI) openSuperuserListModal() {
 
 	closeFn := func() { ui.closeModal(pageName) }
 
-	table.SetSelectedFunc(func(row, _ int) {
-		if row >= 0 && row < len(manager.superusers) {
-			su := manager.superusers[row]
-			ui.pages.RemovePage(pageName)
-			ui.openSuperuserEditModal(manager.selectedDB, &su)
+	openEditForRow := func(row int) {
+		if row < 0 || row >= len(manager.superusers) {
+			return
 		}
+		su := manager.superusers[row]
+		ui.pages.RemovePage(pageName)
+		ui.openSuperuserEditModal(manager.selectedDB, &su, func() {
+			ui.pages.RemovePage("superuser-edit")
+			ui.openSuperuserListModal()
+		})
+	}
+
+	table.SetSelectedFunc(func(row, _ int) {
+		openEditForRow(row)
 	})
 	table.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Key() {
@@ -1344,49 +1406,31 @@ func (ui *navigatorTUI) openSuperuserListModal() {
 			closeFn()
 			return nil
 		}
+		switch event.Rune() {
+		case 'n':
+			ui.pages.RemovePage(pageName)
+			ui.openSuperuserEditModal(manager.selectedDB, nil, func() {
+				ui.pages.RemovePage("superuser-edit")
+				ui.openSuperuserListModal()
+			})
+			return nil
+		case 'e':
+			row, _ := table.GetSelection()
+			openEditForRow(row)
+			return nil
+		case 'D':
+			if len(manager.superusers) == 0 {
+				return nil
+			}
+			row, _ := table.GetSelection()
+			if row < 0 || row >= len(manager.superusers) {
+				return nil
+			}
+			manager.selectAlias(manager.superusers[row].Alias)
+			ui.deleteSuperuserManager(manager, func() { ui.openSuperuserListModalForDB(manager.selectedDB) })
+			return nil
+		}
 		return event
-	})
-
-	btnForm := tview.NewForm()
-	btnForm.AddButton("New", func() {
-		ui.pages.RemovePage(pageName)
-		ui.openSuperuserEditModal(manager.selectedDB, nil)
-	})
-	btnForm.AddButton("Edit", func() {
-		if len(manager.superusers) == 0 {
-			return
-		}
-		row, _ := table.GetSelection()
-		if row < 0 || row >= len(manager.superusers) {
-			return
-		}
-		su := manager.superusers[row]
-		ui.pages.RemovePage(pageName)
-		ui.openSuperuserEditModal(manager.selectedDB, &su)
-	})
-	btnForm.AddButton("Delete", func() {
-		if len(manager.superusers) == 0 {
-			return
-		}
-		row, _ := table.GetSelection()
-		if row < 0 || row >= len(manager.superusers) {
-			return
-		}
-		manager.selectAlias(manager.superusers[row].Alias)
-		ui.deleteSuperuserManager(manager)
-	})
-	btnForm.AddButton("Close", closeFn)
-	btnForm.SetButtonsAlign(tview.AlignRight)
-	btnForm.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		switch event.Key() {
-		case tcell.KeyBacktab:
-			ui.app.SetFocus(table)
-			return nil
-		case tcell.KeyEsc:
-			closeFn()
-			return nil
-		}
-		return remapFormArrowNavigation(currentFormPrimitive(btnForm), event)
 	})
 
 	dbForm := tview.NewForm()
@@ -1407,18 +1451,20 @@ func (ui *navigatorTUI) openSuperuserListModal() {
 		return remapFormArrowNavigation(currentFormPrimitive(dbForm), event)
 	})
 
+	hint := tview.NewTextView().SetText("[n]ew  [e]dit  [D]elete  [Esc]close").SetTextAlign(tview.AlignCenter)
+
 	container := tview.NewFlex().SetDirection(tview.FlexRow)
 	container.SetBorder(true).SetTitle(" Superusers ")
 	container.AddItem(dbForm, 3, 0, false)
 	container.AddItem(table, 0, 1, true)
-	container.AddItem(btnForm, 3, 0, false)
+	container.AddItem(hint, 1, 0, false)
 
 	ui.modalOpen = true
 	ui.pages.AddPage(pageName, center(80, 16, container), true, true)
 	ui.app.SetFocus(table)
 }
 
-func (ui *navigatorTUI) openSuperuserEditModal(dbAlias string, item *storage.Superuser) {
+func (ui *navigatorTUI) openSuperuserEditModal(dbAlias string, item *storage.Superuser, onBack func()) {
 	const pageName = "superuser-edit"
 	isNew := item == nil
 
@@ -1447,7 +1493,7 @@ func (ui *navigatorTUI) openSuperuserEditModal(dbAlias string, item *storage.Sup
 
 	backFn := func() {
 		ui.pages.RemovePage(pageName)
-		ui.openSuperuserListModal()
+		onBack()
 	}
 
 	form := tview.NewForm()
@@ -1485,7 +1531,7 @@ func (ui *navigatorTUI) saveDBManager(manager dbManagerState, alias, baseURL str
 	ui.reloadAfterLocalConfigChange("db aliases updated")
 }
 
-func (ui *navigatorTUI) deleteDBManager(manager dbManagerState) {
+func (ui *navigatorTUI) deleteDBManager(manager dbManagerState, onCancel func()) {
 	ui.closeModal("db-list")
 	ui.openConfirmModal("Delete alias '"+manager.selectedAlias+"'?", func() {
 		status := dbDeleteStatus(ui.session.DB.Alias, manager.selectedAlias)
@@ -1494,7 +1540,7 @@ func (ui *navigatorTUI) deleteDBManager(manager dbManagerState) {
 			return
 		}
 		ui.reloadAfterLocalConfigChange(status)
-	})
+	}, onCancel)
 }
 
 func (ui *navigatorTUI) saveSuperuserManager(manager superuserManagerState, alias, email, password string) {
@@ -1510,7 +1556,7 @@ func (ui *navigatorTUI) saveSuperuserManager(manager superuserManagerState, alia
 	ui.reloadAfterLocalConfigChange("superusers updated")
 }
 
-func (ui *navigatorTUI) deleteSuperuserManager(manager superuserManagerState) {
+func (ui *navigatorTUI) deleteSuperuserManager(manager superuserManagerState, onCancel func()) {
 	ui.closeModal("superuser-list")
 	ui.openConfirmModal("Delete superuser '"+manager.selectedAlias+"'?", func() {
 		status := superuserDeleteStatus(ui.session, manager.selectedDB, manager.selectedAlias)
@@ -1519,7 +1565,7 @@ func (ui *navigatorTUI) deleteSuperuserManager(manager superuserManagerState) {
 			return
 		}
 		ui.reloadAfterLocalConfigChange(status)
-	})
+	}, onCancel)
 }
 
 func (ui *navigatorTUI) reloadAfterLocalConfigChange(status string) {
@@ -1573,7 +1619,7 @@ func (ui *navigatorTUI) focusMain() {
 	}
 }
 
-func (ui *navigatorTUI) openConfirmModal(message string, onConfirm func()) {
+func (ui *navigatorTUI) openConfirmModal(message string, onConfirm func(), onCancel func()) {
 	const pageName = "confirm"
 	form := tview.NewForm()
 	form.AddButton("Confirm", func() {
@@ -1582,6 +1628,9 @@ func (ui *navigatorTUI) openConfirmModal(message string, onConfirm func()) {
 	})
 	form.AddButton("Cancel", func() {
 		ui.closeModal(pageName)
+		if onCancel != nil {
+			onCancel()
+		}
 	})
 	form.SetBorder(true).SetTitle(" Confirm ")
 	form.SetButtonsAlign(tview.AlignCenter)
@@ -1591,7 +1640,12 @@ func (ui *navigatorTUI) openConfirmModal(message string, onConfirm func()) {
 	container.AddItem(text, 0, 1, false)
 	container.AddItem(form, 3, 0, true)
 
-	installFormArrowNavigationWithClose(form, func() { ui.closeModal(pageName) })
+	installFormArrowNavigationWithClose(form, func() {
+		ui.closeModal(pageName)
+		if onCancel != nil {
+			onCancel()
+		}
+	})
 	ui.modalOpen = true
 	ui.pages.AddPage(pageName, center(60, 7, container), true, true)
 	ui.app.SetFocus(form)
