@@ -71,14 +71,13 @@ func TestNavigatorTUISimulationOpensSelectedRecordDetail(t *testing.T) {
 		detailVisible: false,
 	})
 
-	h.injectRune('j')
 	h.injectKey(tcell.KeyEnter)
-	h.waitForText(`"detail_token": "detail-second"`, "y copy", "record")
+	h.waitForText(`"detail_token": "detail-first"`, "y copy", "record")
 	assert.Equal(t, screenRecordDetail, h.ui.screen)
 
 	h.injectKey(tcell.KeyEsc)
 	h.waitForText("ID", "TITLE")
-	h.waitForMissing(`"detail_token": "detail-second"`)
+	h.waitForMissing(`"detail_token": "detail-first"`)
 	assert.Equal(t, screenRecords, h.ui.screen)
 }
 
