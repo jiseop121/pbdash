@@ -962,13 +962,13 @@ func (ui *navigatorTUI) emptyTableMessage() string {
 func (ui *navigatorTUI) emptyDetailText() string {
 	switch ui.screen {
 	case screenDBList:
-		return "No DB aliases configured. Press [n] to add one."
+		return tview.Escape("No DB aliases configured. Press [n] to add one.")
 	case screenSuperusers:
 		db := strings.TrimSpace(ui.session.DB.Alias)
 		if db == "" {
-			return "No superusers. Press [n] to add one."
+			return tview.Escape("No superusers. Press [n] to add one.")
 		}
-		return "No superusers for '" + db + "'. Press [n] to add one."
+		return tview.Escape("No superusers for '" + db + "'. Press [n] to add one.")
 	case screenCollections:
 		return "No collections"
 	case screenRecords:
