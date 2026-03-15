@@ -1424,6 +1424,7 @@ func (ui *navigatorTUI) openSuperuserListModalForDB(initialDB string) {
 	fillSuperuserTable()
 
 	closeFn := func() { ui.closeModal(pageName) }
+	var dbForm *tview.Form
 
 	openEditForRow := func(row int) {
 		if row < 0 || row >= len(manager.superusers) {
@@ -1444,6 +1445,9 @@ func (ui *navigatorTUI) openSuperuserListModalForDB(initialDB string) {
 		switch event.Key() {
 		case tcell.KeyEsc:
 			closeFn()
+			return nil
+		case tcell.KeyTab:
+			ui.app.SetFocus(dbForm)
 			return nil
 		}
 		switch event.Rune() {
@@ -1473,7 +1477,7 @@ func (ui *navigatorTUI) openSuperuserListModalForDB(initialDB string) {
 		return event
 	})
 
-	dbForm := tview.NewForm()
+	dbForm = tview.NewForm()
 	dbForm.AddDropDown("db", dbAliasOptions(dbs), manager.selectedDBIndex(), func(text string, _ int) {
 		manager.selectedDB = text
 		if err := manager.loadSuperusers(ui.dispatcher); err != nil {
@@ -1486,6 +1490,9 @@ func (ui *navigatorTUI) openSuperuserListModalForDB(initialDB string) {
 		switch event.Key() {
 		case tcell.KeyEsc:
 			closeFn()
+			return nil
+		case tcell.KeyTab, tcell.KeyBacktab:
+			ui.app.SetFocus(table)
 			return nil
 		}
 		return remapFormArrowNavigation(currentFormPrimitive(dbForm), event)
