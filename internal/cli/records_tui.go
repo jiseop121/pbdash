@@ -1411,7 +1411,7 @@ func (ui *navigatorTUI) openSuperuserListModalForDB(initialDB string) {
 	fillSuperuserTable := func() {
 		table.Clear()
 		if len(manager.superusers) == 0 {
-			table.SetCell(0, 0, tview.NewTableCell("No entries yet. Press New to add one."))
+			table.SetCell(0, 0, tview.NewTableCell("No entries yet. Press 'n' to add one."))
 			table.SetSelectable(false, false)
 			return
 		}
@@ -1845,7 +1845,7 @@ func buildManagerTable(rows [][]string) *tview.Table {
 	table := tview.NewTable().SetSelectable(true, false)
 	table.SetBorderPadding(0, 0, 1, 1)
 	if len(rows) == 0 {
-		table.SetCell(0, 0, tview.NewTableCell("No entries yet. Press New to add one."))
+		table.SetCell(0, 0, tview.NewTableCell("No entries yet. Press 'n' to add one."))
 		table.SetSelectable(false, false)
 		return table
 	}
