@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.1] - 2026-03-18
+
+### Fixed
+- Disable HTTP keep-alives on the PocketBase HTTP client to fix EOF errors
+  when connecting through TCP proxies (e.g. kftray Kubernetes port-forwarding).
+  Previously, Go's default keep-alive transport caused the proxy to close
+  connections immediately, leading to `require_record_token` or
+  `resource_not_found (404)` errors during authentication.
+
 ## [0.7.0] - 2026-03-15
 
 ### Added
