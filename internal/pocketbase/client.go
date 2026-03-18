@@ -20,7 +20,10 @@ type Client struct {
 }
 
 func NewClient() *Client {
-	return &Client{httpClient: &http.Client{Timeout: 15 * time.Second}}
+	return &Client{httpClient: &http.Client{
+		Timeout:   15 * time.Second,
+		Transport: &http.Transport{DisableKeepAlives: true},
+	}}
 }
 
 type APIError struct {
