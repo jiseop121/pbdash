@@ -20,7 +20,17 @@ type Client struct {
 }
 
 func NewClient() *Client {
-	return &Client{httpClient: &http.Client{Timeout: 15 * time.Second}}
+	// Clone DefaultTransport to preserve TLS, proxy env vars, and other
+	// production settings, then disable keep-alives so each request uses a
+	// fresh TCP connection. This is required for TCP proxy environments
+	// (e.g. kftray Kubernetes port-forwarding) where the proxy closes the
+	// connection immediately after each response, causing EOF on reuse.
+	t := http.DefaultTransport.(*http.Transport).Clone()
+	t.DisableKeepAlives = true
+	return &Client{httpClient: &http.Client{
+		Timeout:   15 * time.Second,
+		Transport: t,
+	}}
 }
 
 type APIError struct {
@@ -169,11 +179,7 @@ func (c *Client) GetJSON(ctx context.Context, baseURL, token, endpoint string, q
 }
 
 func (c *Client) newSDKClient(baseURL string) *pbclient.Client {
-	httpClient := c.httpClient
-	if httpClient == nil {
-		httpClient = &http.Client{Timeout: 15 * time.Second}
-	}
-	return pbclient.NewClient(baseURL, pbclient.WithHTTPClient(httpClient))
+	return pbclient.NewClient(baseURL, pbclient.WithHTTPClient(c.httpClient))
 }
 
 func mapSDKError(err error) error {
