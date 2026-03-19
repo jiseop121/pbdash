@@ -149,6 +149,7 @@ func (d *Dispatcher) runRecordsTUI(ctx context.Context, session pbSession, state
 }
 
 func (d *Dispatcher) runNavigatorTUI(ctx context.Context, route navigatorRoute) error {
+	tview.Styles.PrimitiveBackgroundColor = tcell.ColorDefault
 	ui := &navigatorTUI{
 		dispatcher:    d,
 		ctx:           ctx,
