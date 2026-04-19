@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/jiseop121/pbdash/internal/apperr"
 	"github.com/jiseop121/pbdash/internal/cli"
 )
 
@@ -41,7 +42,7 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 	mode := ResolveMode(cfg)
 	switch mode {
 	case ModeUIReserved:
-		result.err = NewInvalidArgsError("Web UI is under development.", "")
+		result.err = apperr.Invalid("Web UI is under development.", "")
 	case ModeTUI:
 		result.err = runTUI(ctx, dispatcher)
 	case ModeOneShot:
@@ -51,7 +52,7 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 	case ModeREPL:
 		result = runREPL(ctx, cfg.Stdin, cfg.Stdout, cfg.Stderr, dataDir, dispatcher)
 	default:
-		result.err = NewRuntimeError("Could not resolve execution mode.", "", nil)
+		result.err = apperr.RuntimeErr("Could not resolve execution mode.", "", nil)
 	}
 
 	if result.err != nil && !result.alreadyReported {
@@ -66,7 +67,7 @@ func runOneShot(ctx context.Context, commandText string, dispatcher *cli.Dispatc
 
 func runTUI(ctx context.Context, dispatcher *cli.Dispatcher) error {
 	if !dispatcher.HasTTY() {
-		return NewInvalidArgsError("Default TUI mode requires a TTY terminal.", "Use `pbdash -repl`, `pbdash -c \"...\"`, or `pbdash <script-file>` in non-interactive environments.")
+		return apperr.Invalid("Default TUI mode requires a TTY terminal.", "Use `pbdash -repl`, `pbdash -c \"...\"`, or `pbdash <script-file>` in non-interactive environments.")
 	}
 	return dispatcher.RunNavigator(ctx)
 }
@@ -82,7 +83,7 @@ func runScript(ctx context.Context, path string, stderr io.Writer, dispatcher *c
 		if errors.Is(execErr, cli.ErrExitRequested) {
 			return cli.ErrExitRequested
 		}
-		wrapped := WrapScriptLineError(lineNo, execErr)
+		wrapped := apperr.WrapScriptLineError(lineNo, execErr)
 		writeError(stderr, wrapped)
 		lastErr = execErr
 		return nil
@@ -142,7 +143,7 @@ func writeError(stderr io.Writer, err error) {
 	if stderr == nil || err == nil {
 		return
 	}
-	_, _ = fmt.Fprintln(stderr, FormatErrorOutput(err))
+	_, _ = fmt.Fprintln(stderr, apperr.Format(err))
 }
 
 func defaultDataDir() string {

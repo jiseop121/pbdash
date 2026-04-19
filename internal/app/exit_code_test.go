@@ -1,6 +1,10 @@
 package app
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/jiseop121/pbdash/internal/apperr"
+)
 
 func TestMapErrorToExitCode(t *testing.T) {
 	tests := []struct {
@@ -9,10 +13,10 @@ func TestMapErrorToExitCode(t *testing.T) {
 		want int
 	}{
 		{name: "nil", err: nil, want: 0},
-		{name: "invalid", err: NewInvalidArgsError("bad", ""), want: 2},
-		{name: "runtime", err: NewRuntimeError("runtime", "", nil), want: 1},
-		{name: "external", err: NewExternalError("external", "", nil), want: 3},
-		{name: "script wrapped invalid", err: WrapScriptLineError(2, NewInvalidArgsError("bad", "")), want: 2},
+		{name: "invalid", err: apperr.Invalid("bad", ""), want: 2},
+		{name: "runtime", err: apperr.RuntimeErr("runtime", "", nil), want: 1},
+		{name: "external", err: apperr.ExternalErr("external", "", nil), want: 3},
+		{name: "script wrapped invalid", err: apperr.WrapScriptLineError(2, apperr.Invalid("bad", "")), want: 2},
 	}
 
 	for _, tc := range tests {

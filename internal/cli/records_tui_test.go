@@ -176,19 +176,18 @@ func TestNavigatorTUICloseAndDismissErrorRestoreMainFocus(t *testing.T) {
 	ui := newTestNavigatorTUI()
 	ui.setupViews()
 
-	ui.modalOpen = true
 	ui.pages.AddPage("test-modal", tview.NewTextView(), true, true)
 	ui.closeModal("test-modal")
-	assert.False(t, ui.modalOpen)
+	assert.False(t, ui.isModalOpen())
 	assert.False(t, ui.pages.HasPage("test-modal"))
 	assert.Same(t, ui.tableView, ui.app.GetFocus())
 
 	ui.showError(assert.AnError)
-	require.True(t, ui.modalOpen)
+	require.True(t, ui.isModalOpen())
 	require.True(t, ui.pages.HasPage("error"))
 
 	ui.dismissErrorModal()
-	assert.False(t, ui.modalOpen)
+	assert.False(t, ui.isModalOpen())
 	assert.False(t, ui.pages.HasPage("error"))
 	assert.Same(t, ui.tableView, ui.app.GetFocus())
 }
@@ -350,7 +349,7 @@ func TestScreenDBListBKey(t *testing.T) {
 	result := ui.consumeRuneCommand('b')
 
 	assert.False(t, result)
-	assert.False(t, ui.modalOpen)
+	assert.False(t, ui.isModalOpen())
 	assert.False(t, ui.pages.HasPage("db-list"))
 }
 
@@ -501,10 +500,10 @@ func TestConsumeRuneCommandUKey(t *testing.T) {
 
 			assert.Equal(t, tt.wantConsumed, got)
 			if tt.wantModalPage != "" {
-				assert.True(t, ui.modalOpen)
+				assert.True(t, ui.isModalOpen())
 				assert.True(t, ui.pages.HasPage(tt.wantModalPage))
 			} else {
-				assert.False(t, ui.modalOpen)
+				assert.False(t, ui.isModalOpen())
 			}
 		})
 	}
@@ -563,10 +562,10 @@ func TestConsumeRuneCommandInlineDBListCRUD(t *testing.T) {
 
 			assert.Equal(t, tt.wantConsumed, got)
 			if tt.wantModalPage != "" {
-				assert.True(t, ui.modalOpen)
+				assert.True(t, ui.isModalOpen())
 				assert.True(t, ui.pages.HasPage(tt.wantModalPage))
 			} else {
-				assert.False(t, ui.modalOpen)
+				assert.False(t, ui.isModalOpen())
 			}
 		})
 	}
@@ -628,10 +627,10 @@ func TestConsumeRuneCommandInlineSuperusersCRUD(t *testing.T) {
 
 			assert.Equal(t, tt.wantConsumed, got)
 			if tt.wantModalPage != "" {
-				assert.True(t, ui.modalOpen)
+				assert.True(t, ui.isModalOpen())
 				assert.True(t, ui.pages.HasPage(tt.wantModalPage))
 			} else {
-				assert.False(t, ui.modalOpen)
+				assert.False(t, ui.isModalOpen())
 			}
 		})
 	}
@@ -874,12 +873,11 @@ func TestOpenConfirmModalConfirmCallsOnConfirm(t *testing.T) {
 	called := false
 	ui.openConfirmModal("Delete this?", func() { called = true }, nil)
 
-	require.True(t, ui.modalOpen)
+	require.True(t, ui.isModalOpen())
 	require.True(t, ui.pages.HasPage("confirm"))
 
 	// simulate Confirm button press via closeModal + callback
 	ui.pages.RemovePage("confirm")
-	ui.modalOpen = false
 	called = true // confirm path
 
 	assert.True(t, called)
@@ -894,7 +892,6 @@ func TestOpenConfirmModalCancelDoesNotCallOnConfirm(t *testing.T) {
 
 	// simulate Cancel: close modal without calling onConfirm
 	ui.pages.RemovePage("confirm")
-	ui.modalOpen = false
 
 	assert.False(t, called)
 }

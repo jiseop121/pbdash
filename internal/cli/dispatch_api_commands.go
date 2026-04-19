@@ -17,154 +17,163 @@ func (d *Dispatcher) execAPI(ctx context.Context, args []string) error {
 		return apperr.Invalid("Missing api subcommand.", "Use: api collections|collection|records|record")
 	}
 
-	sub := args[0]
-	switch sub {
+	switch args[0] {
 	case "collections":
-		fs := newFlagSet("api collections")
-		dbAlias := fs.String("db", "", "")
-		suAlias := fs.String("superuser", "", "")
-		format := fs.String("format", "table", "")
-		out := fs.String("out", "", "")
-		if err := fs.Parse(args[1:]); err != nil {
-			return invalidFlagError(err)
-		}
-		if _, err := validateOutputOptions(*format, *out); err != nil {
-			return err
-		}
-		target, err := d.resolveSession(*dbAlias, *suAlias)
-		if err != nil {
-			return err
-		}
-		payload, err := d.getJSONWithAuth(ctx, target, pocketbase.BuildCollectionsEndpoint(), nil)
-		if err != nil {
-			return err
-		}
-		result := pocketbase.ParseItemsResult(payload)
-		return d.writeQueryResult(*format, *out, result)
-
+		return d.execAPICollections(ctx, args[1:])
 	case "collection":
-		fs := newFlagSet("api collection")
-		dbAlias := fs.String("db", "", "")
-		suAlias := fs.String("superuser", "", "")
-		name := fs.String("name", "", "")
-		format := fs.String("format", "table", "")
-		out := fs.String("out", "", "")
-		if err := fs.Parse(args[1:]); err != nil {
-			return invalidFlagError(err)
-		}
-		if *name == "" {
-			return apperr.Invalid("Missing required option `--name`.", "Example: api collection --name posts")
-		}
-		if _, err := validateOutputOptions(*format, *out); err != nil {
-			return err
-		}
-		target, err := d.resolveSession(*dbAlias, *suAlias)
-		if err != nil {
-			return err
-		}
-		payload, err := d.getJSONWithAuth(ctx, target, pocketbase.BuildCollectionEndpoint(*name), nil)
-		if err != nil {
-			return err
-		}
-		result := pocketbase.ParseSingleResult(payload)
-		return d.writeQueryResult(*format, *out, result)
-
+		return d.execAPICollection(ctx, args[1:])
 	case "records":
-		fs := newFlagSet("api records")
-		dbAlias := fs.String("db", "", "")
-		suAlias := fs.String("superuser", "", "")
-		collection := fs.String("collection", "", "")
-		page := fs.String("page", "", "")
-		perPage := fs.String("per-page", "", "")
-		sortExpr := fs.String("sort", "", "")
-		filterExpr := fs.String("filter", "", "")
-		format := fs.String("format", "table", "")
-		out := fs.String("out", "", "")
-		view := fs.String("view", "auto", "")
-		if err := fs.Parse(args[1:]); err != nil {
-			return invalidFlagError(err)
-		}
-		if *collection == "" {
-			return apperr.Invalid("Missing required option `--collection`.", "Example: api records --collection posts")
-		}
-
-		normalizedFormat, err := validateOutputOptions(*format, *out)
-		if err != nil {
-			return err
-		}
-		normalizedView, err := normalizeView(*view)
-		if err != nil {
-			return err
-		}
-		shouldTUI, err := shouldUseRecordsTUI(normalizedView, normalizedFormat, d.HasTTY())
-		if err != nil {
-			return err
-		}
-
-		state := RecordsQueryState{
-			Collection: *collection,
-			Sort:       *sortExpr,
-			Filter:     *filterExpr,
-		}
-		if *page != "" {
-			v, err := positiveInt(*page)
-			if err != nil {
-				return apperr.Invalid("Invalid `--page` value.", "`--page` must be a positive integer.")
-			}
-			state.Page = v
-		}
-		if *perPage != "" {
-			v, err := positiveInt(*perPage)
-			if err != nil {
-				return apperr.Invalid("Invalid `--per-page` value.", "`--per-page` must be a positive integer.")
-			}
-			state.PerPage = v
-		}
-
-		target, err := d.resolveSession(*dbAlias, *suAlias)
-		if err != nil {
-			return err
-		}
-		if shouldTUI {
-			return d.runRecordsTUI(ctx, target, state)
-		}
-		result, err := d.fetchRecords(ctx, target, state)
-		if err != nil {
-			return err
-		}
-		return d.writeQueryResult(normalizedFormat, *out, result)
-
+		return d.execAPIRecords(ctx, args[1:])
 	case "record":
-		fs := newFlagSet("api record")
-		dbAlias := fs.String("db", "", "")
-		suAlias := fs.String("superuser", "", "")
-		collection := fs.String("collection", "", "")
-		recordID := fs.String("id", "", "")
-		format := fs.String("format", "table", "")
-		out := fs.String("out", "", "")
-		if err := fs.Parse(args[1:]); err != nil {
-			return invalidFlagError(err)
-		}
-		if *collection == "" || *recordID == "" {
-			return apperr.Invalid("Missing required options `--collection` and `--id`.", "Example: api record --collection posts --id rec123")
-		}
-		normalizedFormat, err := validateOutputOptions(*format, *out)
-		if err != nil {
-			return err
-		}
-		target, err := d.resolveSession(*dbAlias, *suAlias)
-		if err != nil {
-			return err
-		}
-		payload, err := d.getJSONWithAuth(ctx, target, pocketbase.BuildRecordEndpoint(*collection, *recordID), nil)
-		if err != nil {
-			return err
-		}
-		result := pocketbase.ParseSingleResult(payload)
-		return d.writeQueryResult(normalizedFormat, *out, result)
+		return d.execAPIRecord(ctx, args[1:])
 	default:
 		return apperr.Invalid("This CLI is read-only for PocketBase API operations.", "Only GET requests are supported.")
 	}
+}
+
+func (d *Dispatcher) execAPICollections(ctx context.Context, args []string) error {
+	fs := newFlagSet("api collections")
+	dbAlias := fs.String("db", "", "")
+	suAlias := fs.String("superuser", "", "")
+	format := fs.String("format", "table", "")
+	out := fs.String("out", "", "")
+	if err := fs.Parse(args); err != nil {
+		return invalidFlagError(err)
+	}
+	if _, err := validateOutputOptions(*format, *out); err != nil {
+		return err
+	}
+	target, err := d.resolveSession(*dbAlias, *suAlias)
+	if err != nil {
+		return err
+	}
+	result, err := d.fetchCollections(ctx, target)
+	if err != nil {
+		return err
+	}
+	return d.writeQueryResult(*format, *out, result)
+}
+
+func (d *Dispatcher) execAPICollection(ctx context.Context, args []string) error {
+	fs := newFlagSet("api collection")
+	dbAlias := fs.String("db", "", "")
+	suAlias := fs.String("superuser", "", "")
+	name := fs.String("name", "", "")
+	format := fs.String("format", "table", "")
+	out := fs.String("out", "", "")
+	if err := fs.Parse(args); err != nil {
+		return invalidFlagError(err)
+	}
+	if *name == "" {
+		return apperr.Invalid("Missing required option `--name`.", "Example: api collection --name posts")
+	}
+	if _, err := validateOutputOptions(*format, *out); err != nil {
+		return err
+	}
+	target, err := d.resolveSession(*dbAlias, *suAlias)
+	if err != nil {
+		return err
+	}
+	payload, err := d.getJSONWithAuth(ctx, target, pocketbase.BuildCollectionEndpoint(*name), nil)
+	if err != nil {
+		return err
+	}
+	return d.writeQueryResult(*format, *out, pocketbase.ParseSingleResult(payload))
+}
+
+func (d *Dispatcher) execAPIRecords(ctx context.Context, args []string) error {
+	fs := newFlagSet("api records")
+	dbAlias := fs.String("db", "", "")
+	suAlias := fs.String("superuser", "", "")
+	collection := fs.String("collection", "", "")
+	page := fs.String("page", "", "")
+	perPage := fs.String("per-page", "", "")
+	sortExpr := fs.String("sort", "", "")
+	filterExpr := fs.String("filter", "", "")
+	format := fs.String("format", "table", "")
+	out := fs.String("out", "", "")
+	view := fs.String("view", "auto", "")
+	if err := fs.Parse(args); err != nil {
+		return invalidFlagError(err)
+	}
+	if *collection == "" {
+		return apperr.Invalid("Missing required option `--collection`.", "Example: api records --collection posts")
+	}
+
+	normalizedFormat, err := validateOutputOptions(*format, *out)
+	if err != nil {
+		return err
+	}
+	normalizedView, err := normalizeView(*view)
+	if err != nil {
+		return err
+	}
+	shouldTUI, err := shouldUseRecordsTUI(normalizedView, normalizedFormat, d.HasTTY())
+	if err != nil {
+		return err
+	}
+
+	state := RecordsQueryState{
+		Collection: *collection,
+		Sort:       *sortExpr,
+		Filter:     *filterExpr,
+	}
+	if *page != "" {
+		v, err := positiveInt(*page)
+		if err != nil {
+			return apperr.Invalid("Invalid `--page` value.", "`--page` must be a positive integer.")
+		}
+		state.Page = v
+	}
+	if *perPage != "" {
+		v, err := positiveInt(*perPage)
+		if err != nil {
+			return apperr.Invalid("Invalid `--per-page` value.", "`--per-page` must be a positive integer.")
+		}
+		state.PerPage = v
+	}
+
+	target, err := d.resolveSession(*dbAlias, *suAlias)
+	if err != nil {
+		return err
+	}
+	if shouldTUI {
+		return d.runRecordsTUI(ctx, target, state)
+	}
+	result, err := d.fetchRecords(ctx, target, state)
+	if err != nil {
+		return err
+	}
+	return d.writeQueryResult(normalizedFormat, *out, result)
+}
+
+func (d *Dispatcher) execAPIRecord(ctx context.Context, args []string) error {
+	fs := newFlagSet("api record")
+	dbAlias := fs.String("db", "", "")
+	suAlias := fs.String("superuser", "", "")
+	collection := fs.String("collection", "", "")
+	recordID := fs.String("id", "", "")
+	format := fs.String("format", "table", "")
+	out := fs.String("out", "", "")
+	if err := fs.Parse(args); err != nil {
+		return invalidFlagError(err)
+	}
+	if *collection == "" || *recordID == "" {
+		return apperr.Invalid("Missing required options `--collection` and `--id`.", "Example: api record --collection posts --id rec123")
+	}
+	normalizedFormat, err := validateOutputOptions(*format, *out)
+	if err != nil {
+		return err
+	}
+	target, err := d.resolveSession(*dbAlias, *suAlias)
+	if err != nil {
+		return err
+	}
+	payload, err := d.getJSONWithAuth(ctx, target, pocketbase.BuildRecordEndpoint(*collection, *recordID), nil)
+	if err != nil {
+		return err
+	}
+	return d.writeQueryResult(normalizedFormat, *out, pocketbase.ParseSingleResult(payload))
 }
 
 func normalizeView(view string) (string, error) {
@@ -263,6 +272,14 @@ func contextMatchesDB(ctx commandContext, resolvedDB string) bool {
 		return false
 	}
 	return strings.EqualFold(ctx.DBAlias, resolvedDB)
+}
+
+func (d *Dispatcher) fetchCollections(ctx context.Context, target pbSession) (pocketbase.QueryResult, error) {
+	payload, err := d.getJSONWithAuth(ctx, target, pocketbase.BuildCollectionsEndpoint(), nil)
+	if err != nil {
+		return pocketbase.QueryResult{}, err
+	}
+	return pocketbase.ParseItemsResult(payload), nil
 }
 
 func (d *Dispatcher) fetchRecords(ctx context.Context, target pbSession, state RecordsQueryState) (pocketbase.QueryResult, error) {

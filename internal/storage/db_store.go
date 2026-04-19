@@ -1,10 +1,8 @@
 package storage
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/url"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -132,32 +130,16 @@ func (s *DBStore) Find(alias string) (DB, bool, error) {
 }
 
 func (s *DBStore) readAll() ([]DB, error) {
-	data, err := os.ReadFile(s.path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return []DB{}, nil
-		}
-		return nil, err
-	}
-	if len(strings.TrimSpace(string(data))) == 0 {
-		return []DB{}, nil
-	}
 	var items []DB
-	if err := json.Unmarshal(data, &items); err != nil {
-		return nil, err
+	found, err := readJSONFile(s.path, &items)
+	if err != nil || !found {
+		return []DB{}, err
 	}
 	return items, nil
 }
 
 func (s *DBStore) writeAll(items []DB) error {
-	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
-		return err
-	}
-	data, err := json.MarshalIndent(items, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(s.path, append(data, '\n'), 0o600)
+	return writeJSONFile(s.path, items)
 }
 
 func validateBaseURL(raw string) error {
