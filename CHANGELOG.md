@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.3] - 2026-04-19
+
+### Fixed
+- TUI errors from refresh, page navigation, and column selection are now
+  displayed instead of being silently dropped.
+- Column filter modal: validation error no longer leaves the columns modal
+  open underneath the error modal (modal stacking was corrupted).
+
+### Changed
+- Internal: `records_tui.go` (2141 lines) split into three focused files —
+  lifecycle/navigation, rendering, and modals — for easier maintenance.
+- Internal: shared JSON file I/O extracted into `storage/json_file.go`;
+  redundant `app/errors.go` wrapper layer removed.
+
 ## [0.7.2] - 2026-03-19
 
 ### Fixed
