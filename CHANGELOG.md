@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.2] - 2026-03-19
+
+### Fixed
+- Remove grey default background: set `tview.Styles.PrimitiveBackgroundColor`
+  to `tcell.ColorDefault` so the terminal's own background colour is used
+  instead of tview's built-in grey.
+
 ## [0.7.1] - 2026-03-18
 
 ### Fixed

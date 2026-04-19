@@ -5,7 +5,6 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -233,19 +232,13 @@ func (s *SuperuserStore) Find(dbAlias, alias string) (Superuser, bool, error) {
 }
 
 func (s *SuperuserStore) readAll() ([]Superuser, error) {
-	data, err := os.ReadFile(s.path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return []Superuser{}, nil
-		}
-		return nil, err
-	}
-	if len(strings.TrimSpace(string(data))) == 0 {
-		return []Superuser{}, nil
-	}
 	var items []Superuser
-	if err := json.Unmarshal(data, &items); err != nil {
+	found, err := readJSONFile(s.path, &items)
+	if err != nil {
 		return nil, err
+	}
+	if !found {
+		return []Superuser{}, nil
 	}
 
 	needsDecryption := false
@@ -310,11 +303,7 @@ func (s *SuperuserStore) writeAll(items []Superuser) error {
 		})
 	}
 
-	data, err := json.MarshalIndent(persisted, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(s.path, append(data, '\n'), 0o600)
+	return writeJSONFile(s.path, persisted)
 }
 
 func (s *SuperuserStore) loadOrCreateKey() ([]byte, error) {

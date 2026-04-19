@@ -3,6 +3,8 @@ package app
 import (
 	"io"
 	"strings"
+
+	"github.com/jiseop121/pbdash/internal/apperr"
 )
 
 type ExecMode string
@@ -37,10 +39,10 @@ func ParseRunConfig(args []string, stdin io.Reader, stdout, stderr io.Writer) (R
 			cfg.REPLEnabled = true
 		case "-c":
 			if i+1 >= len(args) {
-				return cfg, NewInvalidArgsError("Missing command text for `-c`.", "Example: pbdash -c \"version\"")
+				return cfg, apperr.Invalid("Missing command text for `-c`.", "Example: pbdash -c \"version\"")
 			}
 			if strings.TrimSpace(args[i+1]) == "" {
-				return cfg, NewInvalidArgsError("Command text for `-c` cannot be empty.", "Example: pbdash -c \"version\"")
+				return cfg, apperr.Invalid("Command text for `-c` cannot be empty.", "Example: pbdash -c \"version\"")
 			}
 			cfg.CommandText = args[i+1]
 			i++
@@ -52,10 +54,10 @@ func ParseRunConfig(args []string, stdin io.Reader, stdout, stderr io.Writer) (R
 			}
 		default:
 			if len(arg) > 0 && arg[0] == '-' {
-				return cfg, NewInvalidArgsError("Unknown option `"+arg+"`.", "Run `pbdash -c \"help\"` to see available commands.")
+				return cfg, apperr.Invalid("Unknown option `"+arg+"`.", "Run `pbdash -c \"help\"` to see available commands.")
 			}
 			if cfg.ScriptPath != "" {
-				return cfg, NewInvalidArgsError("Only one script file path can be provided.", "Use: pbdash <script-file>")
+				return cfg, apperr.Invalid("Only one script file path can be provided.", "Use: pbdash <script-file>")
 			}
 			cfg.ScriptPath = arg
 		}
@@ -69,13 +71,13 @@ func ParseRunConfig(args []string, stdin io.Reader, stdout, stderr io.Writer) (R
 
 func ValidateRunConfig(cfg RunConfig) error {
 	if cfg.CommandText != "" && cfg.ScriptPath != "" {
-		return NewInvalidArgsError("Cannot use `-c` and script file path together.", "Choose one mode: `pbdash -c \"...\"` or `pbdash <script-file>`")
+		return apperr.Invalid("Cannot use `-c` and script file path together.", "Choose one mode: `pbdash -c \"...\"` or `pbdash <script-file>`")
 	}
 	if cfg.UIEnabled && (cfg.CommandText != "" || cfg.ScriptPath != "" || cfg.REPLEnabled) {
-		return NewInvalidArgsError("`-ui` cannot be used with `-c`, script, or `-repl` mode.", "Run `pbdash -ui` alone.")
+		return apperr.Invalid("`-ui` cannot be used with `-c`, script, or `-repl` mode.", "Run `pbdash -ui` alone.")
 	}
 	if cfg.REPLEnabled && (cfg.CommandText != "" || cfg.ScriptPath != "") {
-		return NewInvalidArgsError("`-repl` cannot be used with `-c` or script mode.", "Run `pbdash -repl` alone.")
+		return apperr.Invalid("`-repl` cannot be used with `-c` or script mode.", "Run `pbdash -repl` alone.")
 	}
 	return nil
 }
