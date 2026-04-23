@@ -143,14 +143,21 @@ func (s *SuperuserStore) Update(dbAlias, currentAlias, nextAlias, email, passwor
 		return NewValidationError(fmt.Sprintf("superuser alias %q is not configured for db %q", currentAlias, dbAlias))
 	}
 
+	// 비밀번호 미입력 시 기존 암호화값을 그대로 사용 (복호화된 평문을 불필요하게 보유하지 않음)
 	if strings.TrimSpace(password) == "" {
-		password = items[target].Password
-	}
-	items[target] = Superuser{
-		DBAlias:  dbAlias,
-		Alias:    nextAlias,
-		Email:    email,
-		Password: password,
+		items[target] = Superuser{
+			DBAlias:     dbAlias,
+			Alias:       nextAlias,
+			Email:       email,
+			PasswordEnc: items[target].PasswordEnc,
+		}
+	} else {
+		items[target] = Superuser{
+			DBAlias:  dbAlias,
+			Alias:    nextAlias,
+			Email:    email,
+			Password: password,
+		}
 	}
 	return s.writeAll(items)
 }
@@ -275,7 +282,7 @@ func (s *SuperuserStore) readAll() ([]Superuser, error) {
 }
 
 func (s *SuperuserStore) writeAll(items []Superuser) error {
-	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(s.path), 0o700); err != nil {
 		return err
 	}
 	key, err := s.loadOrCreateKey()
@@ -325,7 +332,7 @@ func (s *SuperuserStore) loadOrCreateKey() ([]byte, error) {
 		return nil, err
 	}
 
-	if err := os.MkdirAll(filepath.Dir(s.keyPath), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(s.keyPath), 0o700); err != nil {
 		return nil, err
 	}
 

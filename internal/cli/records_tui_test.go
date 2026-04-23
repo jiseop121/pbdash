@@ -643,8 +643,8 @@ func TestHelpText(t *testing.T) {
 		screen navigatorScreen
 		want   string
 	}{
-		{screenDBList, "q quit  Enter select  n new  e edit  D del  u superusers  r refresh"},
-		{screenSuperusers, "q quit  esc/backspace back  Enter select  n new  e edit  D del  b db aliases  r refresh"},
+		{screenDBList, "q 종료  Enter 선택  n 추가  e 편집  D 삭제  u 슈퍼유저  r 새로고침"},
+		{screenSuperusers, "q 종료  Esc/← 뒤로  Enter 선택  n 추가  e 편집  D 삭제  b DB목록  r 새로고침"},
 	}
 	for _, tt := range tests {
 		t.Run(string(tt.screen), func(t *testing.T) {

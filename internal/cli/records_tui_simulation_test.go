@@ -49,7 +49,8 @@ func TestNavigatorTUISimulationRendersRecordsScreen(t *testing.T) {
 		detailVisible: false,
 	})
 
-	h.waitForText("collection=posts", "page 1/1 (2 items)", "ID", "TITLE", "/ filter")
+	// 헬프바 확인: "h/l"은 ASCII라 공백 삽입 없이 그대로 렌더링됨
+	h.waitForText("collection=posts", "page 1/1 (2 items)", "ID", "TITLE", "h/l")
 	h.waitForMissing("record detail")
 }
 
@@ -72,7 +73,8 @@ func TestNavigatorTUISimulationOpensSelectedRecordDetail(t *testing.T) {
 	})
 
 	h.injectKey(tcell.KeyEnter)
-	h.waitForText(`"detail_token": "detail-first"`, "y copy", "record")
+	// "record detail" 보더 타이틀로 레코드 상세 화면 진입 확인
+	h.waitForText(`"detail_token": "detail-first"`, "record detail")
 	assert.Equal(t, screenRecordDetail, h.ui.screen)
 
 	h.injectKey(tcell.KeyEsc)

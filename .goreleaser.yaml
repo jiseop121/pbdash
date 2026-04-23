@@ -13,6 +13,7 @@ builds:
       - -X github.com/jiseop121/pbdash/internal/app.Version={{.Version}}
     goos:
       - darwin
+      - linux
     goarch:
       - amd64
       - arm64
@@ -21,6 +22,10 @@ archives:
   - id: pbdash
     name_template: "pbdash-v{{ .Version }}-{{ .Os }}-{{ .Arch }}"
     format: tar.gz
+
+checksum:
+  name_template: "pbdash-v{{ .Version }}-checksums.txt"
+  algorithm: sha256
 
 brews:
   - name: pbdash

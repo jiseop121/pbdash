@@ -73,18 +73,34 @@ func mapPBError(err error, superuserAlias, dbAlias string) error {
 func pbErrorHint(status int, code string) string {
 	switch status {
 	case 400:
-		if strings.Contains(code, "invalid_") || strings.Contains(code, "missing_") {
-			return "Check request options (filter/sort/page/per-page/fields) and retry."
+		switch code {
+		case "invalid_filter":
+			return "Filter syntax error. Example: name = 'foo' && active = true. See PocketBase filter docs."
+		case "invalid_sort":
+			return "Sort syntax error. Example: -created,+name (prefix + for asc, - for desc)."
+		case "missing_required_fields":
+			return "One or more required fields are missing from the request."
+		default:
+			if strings.Contains(code, "invalid_") {
+				return "Request validation failed. Check filter/sort/page/per-page/fields options and retry."
+			}
+			if strings.Contains(code, "missing_") {
+				return "A required request parameter is missing. Check --collection, --id, and other required flags."
+			}
+			return "Check request parameters and resource identifiers."
 		}
-		return "Check request parameters and resource identifiers."
 	case 401:
-		return "Check superuser credentials and confirm the account can access this target."
+		return "Authentication failed. Check superuser email and password for this db alias."
 	case 403:
-		return "The authenticated account lacks permission for this request."
+		return "The authenticated superuser lacks permission. Confirm the account has admin access."
 	case 404:
-		return "Check collection name, record id, and target db URL."
+		return "Resource not found. Check collection name, record id, and the db base URL."
+	case 429:
+		return "Rate limit exceeded. Wait a moment and retry, or reduce request frequency."
+	case 500:
+		return "PocketBase server error. Check server logs for details."
 	default:
-		return "Check PocketBase server logs and request parameters."
+		return "Check PocketBase server logs and verify request parameters."
 	}
 }
 
