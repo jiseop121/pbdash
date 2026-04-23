@@ -275,7 +275,7 @@ func (s *SuperuserStore) readAll() ([]Superuser, error) {
 }
 
 func (s *SuperuserStore) writeAll(items []Superuser) error {
-	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(s.path), 0o700); err != nil {
 		return err
 	}
 	key, err := s.loadOrCreateKey()
@@ -325,7 +325,7 @@ func (s *SuperuserStore) loadOrCreateKey() ([]byte, error) {
 		return nil, err
 	}
 
-	if err := os.MkdirAll(filepath.Dir(s.keyPath), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(s.keyPath), 0o700); err != nil {
 		return nil, err
 	}
 
