@@ -346,10 +346,18 @@ func (d *Dispatcher) getCachedToken(target pbSession) (string, bool) {
 	return entry.token, true
 }
 
+// defaultTokenCacheTTL은 JWT에 exp 클레임이 없을 때 사용하는 기본 캐시 유효 시간.
+// 만료 정보 없는 토큰을 무기한 캐시하지 않도록 보수적인 값(15분)을 사용한다.
+const defaultTokenCacheTTL = 15 * time.Minute
+
 func (d *Dispatcher) storeCachedToken(target pbSession, token string) {
 	entry := authCacheEntry{token: token}
 	if expiresAt, ok := parseTokenExpiry(token); ok {
 		entry.expiresAt = expiresAt
+		entry.hasExpiry = true
+	} else {
+		// exp 클레임 파싱 실패 시 기본 TTL로 만료 시간을 설정해 무기한 캐시를 방지
+		entry.expiresAt = d.now().UTC().Add(defaultTokenCacheTTL)
 		entry.hasExpiry = true
 	}
 	key := authCacheKey{dbAlias: strings.ToLower(target.DB.Alias), suAlias: strings.ToLower(target.SU.Alias)}
