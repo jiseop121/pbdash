@@ -35,7 +35,7 @@ endif
 POCKETBASE_ASSET := pocketbase_$(POCKETBASE_VERSION)_$(POCKETBASE_OS)_$(POCKETBASE_ARCH).zip
 POCKETBASE_DOWNLOAD_URL := https://github.com/pocketbase/pocketbase/releases/download/v$(POCKETBASE_VERSION)/$(POCKETBASE_ASSET)
 
-.PHONY: test e2e pocketbase-bin pocketbase-superuser pocketbase-serve pb-su pb-serve release-tag release-brew release-dry-run
+.PHONY: test e2e pocketbase-bin pocketbase-superuser pocketbase-serve pb-su pb-serve release-tag release-brew release-dry-run release-check
 
 test:
 	$(GO) test ./...
@@ -125,7 +125,29 @@ release-brew:
 	@echo "로컬 테스트: make release-dry-run"
 	@exit 1
 
+release-check:
+	@if [ -z "$(VERSION)" ]; then echo "VERSION is required. Example: make release-check VERSION=0.2.1"; exit 1; fi
+	@if ! echo "$(VERSION)" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$$'; then echo "VERSION must be semantic version without v prefix (e.g. 0.2.1)"; exit 1; fi
+	@echo "==> 작업 트리 상태 확인"
+	@if [ -n "$$(git status --porcelain)" ]; then echo "작업 트리가 깨끗하지 않습니다. 변경사항을 커밋하거나 stash하세요."; exit 1; fi
+	@echo "==> 전체 테스트 실행"
+	$(GO) test ./...
+	@echo "==> 태그 중복 확인"
+	@if git rev-parse -q --verify "refs/tags/v$(VERSION)" >/dev/null 2>&1; then \
+		echo "태그 v$(VERSION)이 이미 로컬에 존재합니다."; exit 1; fi
+	@echo "==> CHANGELOG 항목 확인"
+	@if ! grep -q "$(VERSION)" CHANGELOG.md 2>/dev/null; then \
+		echo "경고: CHANGELOG.md에 v$(VERSION) 항목이 없습니다."; fi
+	@echo "✓ pre-release 검증 완료: v$(VERSION)"
+
 release-dry-run:
 	@if ! command -v goreleaser >/dev/null 2>&1; then \
 		echo "goreleaser가 없습니다. 설치: brew install goreleaser"; exit 1; fi
 	goreleaser release --snapshot --clean
+	@echo "==> 빌드 아티팩트 존재 확인"
+	@ls dist/pbdash-v*-darwin-amd64.tar.gz >/dev/null 2>&1 || (echo "오류: darwin-amd64 아티팩트가 없습니다."; exit 1)
+	@ls dist/pbdash-v*-darwin-arm64.tar.gz >/dev/null 2>&1 || (echo "오류: darwin-arm64 아티팩트가 없습니다."; exit 1)
+	@ls dist/pbdash-v*-linux-amd64.tar.gz >/dev/null 2>&1 || (echo "오류: linux-amd64 아티팩트가 없습니다."; exit 1)
+	@ls dist/pbdash-v*-linux-arm64.tar.gz >/dev/null 2>&1 || (echo "오류: linux-arm64 아티팩트가 없습니다."; exit 1)
+	@ls dist/pbdash-v*-checksums.txt >/dev/null 2>&1 || (echo "오류: 체크섬 파일이 없습니다."; exit 1)
+	@echo "✓ dry-run 성공: 모든 아티팩트가 존재합니다."
