@@ -325,18 +325,41 @@ func (ui *navigatorTUI) breadcrumb() string {
 func (ui *navigatorTUI) helpText() string {
 	switch ui.screen {
 	case screenDBList:
-		return "q quit  Enter select  n new  e edit  D del  u superusers  r refresh"
+		return "q 종료  Enter 선택  n 추가  e 편집  D 삭제  u 슈퍼유저  r 새로고침"
 	case screenSuperusers:
-		return "q quit  esc/backspace back  Enter select  n new  e edit  D del  b db aliases  r refresh"
+		return "q 종료  Esc/← 뒤로  Enter 선택  n 추가  e 편집  D 삭제  b DB목록  r 새로고침"
 	case screenCollections:
-		return "q quit  esc/backspace back  Enter select  d detail  b db aliases  u superusers  r refresh"
+		return "q 종료  Esc/← 뒤로  Enter 레코드  d 상세토글  b DB목록  u 슈퍼유저  r 새로고침"
 	case screenRecords:
-		return "q quit  esc/backspace back  h/l or <-/-> horiz  / filter  s sort  c columns  b db aliases  u superusers  [/] page  g/G first/last  r refresh  Enter detail"
+		colInfo := ui.columnOffsetHint()
+		base := "q 종료  Esc/← 뒤로  h/l 컬럼이동  / 필터  s 정렬  c 컬럼선택  [/] 페이지이동  g/G 처음/끝  r 새로고침  Enter 상세"
+		if colInfo != "" {
+			return base + "  " + colInfo
+		}
+		return base
 	case screenRecordDetail:
-		return "q quit  esc/backspace back  y copy  b db aliases  u superusers"
+		return "q 종료  Esc/← 뒤로  y 클립보드복사  b DB목록  u 슈퍼유저"
 	default:
-		return "q quit"
+		return "q 종료"
 	}
+}
+
+func (ui *navigatorTUI) columnOffsetHint() string {
+	if ui.screen != screenRecords {
+		return ""
+	}
+	all := ui.currentColumns()
+	if len(all) <= visibleColumnWindow {
+		return ""
+	}
+	return fmt.Sprintf("컬럼 %d-%d/%d", ui.columnOffset+1, min(ui.columnOffset+visibleColumnWindow, len(all)), len(all))
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func (ui *navigatorTUI) detailTitle() string {
