@@ -171,6 +171,7 @@ func (d *Dispatcher) runNavigatorTUI(ctx context.Context, route navigatorRoute) 
 	ui.setupViews()
 
 	done := make(chan struct{})
+	defer close(done) // panic 시에도 goroutine이 누수되지 않도록 보장
 	go func() {
 		select {
 		case <-ctx.Done():
@@ -183,7 +184,6 @@ func (d *Dispatcher) runNavigatorTUI(ctx context.Context, route navigatorRoute) 
 	ui.focusMain()
 
 	err := ui.app.Run()
-	close(done)
 	if err != nil {
 		return apperr.RuntimeErr("Could not run TUI mode.", "", err)
 	}
