@@ -31,6 +31,7 @@ brews:
   - name: pbdash
     homepage: "https://github.com/jiseop121/pbdash"
     description: "Read-only CLI viewer for PocketBase instances"
+    directory: Formula
     repository:
       owner: jiseop121
       name: homebrew-pbdash
