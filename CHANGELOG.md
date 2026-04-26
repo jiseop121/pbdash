@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.4] - 2026-04-26
+
+### Security
+- Directory permissions for `~/.pbdash` tightened from `0o755` to `0o700` so
+  other local users can no longer list file names inside the data directory.
+- JSON file writes are now atomic: data is written to a `.tmp` file first, then
+  renamed into place, preventing corruption on unexpected process termination.
+- JWT `exp` claim: when parsing fails or the claim is absent the token is now
+  given a default 15-minute TTL instead of being cached indefinitely with no
+  expiry check.
+- `superuser_store.Update()`: when the password is unchanged the encrypted value
+  is forwarded directly; the decrypted plaintext is no longer copied into the
+  new struct.
+
+### Fixed
+- TUI panic recovery: `close(done)` is now called via `defer` so the context
+  goroutine is never permanently blocked after a recovered panic.
+
+### Changed
+- Error hints from `pbErrorHint` now provide specific guidance for
+  `invalid_filter`, `invalid_sort`, `missing_required_fields`, HTTP 429, and
+  HTTP 500 instead of a single generic message for all 400 responses.
+- Help bar text localised to Korean; column header now shows current window
+  position (e.g. `컬럼 1-8/12`) when columns extend beyond the visible area.
+- GoReleaser: `linux` targets (amd64/arm64) added; SHA-256 checksum file
+  generated automatically for each release.
+- Makefile: `make release-check VERSION=x.y.z` added for pre-release validation
+  (working-tree cleanliness, semver format, tests, duplicate tag, CHANGELOG
+  entry); `make release-dry-run` now verifies all four platform artefacts and
+  the checksum file.
+
 ## [0.7.3] - 2026-04-19
 
 ### Fixed
