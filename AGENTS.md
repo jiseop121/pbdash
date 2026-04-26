@@ -117,6 +117,14 @@
 ## Homebrew 릴리스 지침
 - Homebrew Formula는 `jiseop121/homebrew-pbdash` 별도 탭 레포에서 관리합니다.
 - Formula 갱신은 태그 푸시 후 GoReleaser CI가 자동으로 처리합니다. 수동 개입 없음.
+- Formula 파일 위치는 반드시 tap repo의 `Formula/pbdash.rb` 입니다 (루트가 아님).
+  `.goreleaser.yaml` 의 `brews[].directory: Formula` 설정이 이를 보장합니다.
+- Homebrew 설치 시 tap URL은 반드시 `https://github.com/jiseop121/homebrew-pbdash` 를 사용합니다.
+  메인 repo(`https://github.com/jiseop121/pbdash`) URL로 tap하면 formula가 없어 설치 불가합니다.
+  ```bash
+  brew tap jiseop121/pbdash https://github.com/jiseop121/homebrew-pbdash
+  brew install jiseop121/pbdash/pbdash
+  ```
 - 아티팩트 이름은 항상 아래 형식을 유지합니다.
   - `pbdash-v<x.y.z>-darwin-arm64.tar.gz`
   - `pbdash-v<x.y.z>-darwin-amd64.tar.gz`
@@ -124,16 +132,22 @@
 - 빌드 대상 엔트리포인트는 항상 `./cmd/pbdash` 입니다.
 
 ## 릴리스 순서
-1. 워킹 트리가 clean 상태인지 확인합니다.
-2. `make release-tag VERSION=x.y.z`를 실행합니다.
-3. GitHub Actions 완료 확인 (tests → build → formula 커밋 순으로 진행됩니다).
-4. GitHub Release에 darwin 아티팩트 2개 확인.
-5. `jiseop121/homebrew-pbdash` 레포에 Formula 커밋 확인.
+1. `AGENTS.md` 릴리스 섹션과 `docs/reference/development/release.md` 를 먼저 확인합니다.
+2. CHANGELOG에 해당 버전 항목을 작성하고 커밋합니다.
+3. 워킹 트리가 clean 상태인지 확인합니다.
+4. `make release-check VERSION=x.y.z` 로 사전 검증합니다.
+5. `make release-tag VERSION=x.y.z` 를 실행합니다.
+6. GitHub Actions 완료 확인 (tests → build → formula 커밋 순으로 진행됩니다).
+7. GitHub Release에 darwin 아티팩트 2개 확인.
+8. `jiseop121/homebrew-pbdash` 레포에 `Formula/pbdash.rb` 커밋 확인.
 
 ## 금지사항
 - 기존 태그를 재사용하거나 덮어쓰지 않습니다.
 - `make release-brew`를 실행하지 않습니다 (deprecated, GoReleaser CI로 대체됨).
 - 릴리스와 무관한 수정사항을 릴리스 커밋에 섞지 않습니다.
+- `git tag vX.Y.Z` 를 직접 실행하지 않습니다. lightweight tag가 생성되고 테스트·중복 검사가 생략됩니다. 반드시 `make release-tag VERSION=x.y.z` 를 사용합니다.
+- `git push origin vX.Y.Z` 를 직접 실행하지 않습니다. 태그 푸시는 항상 `make release-tag` 를 통해서만 합니다.
+- CHANGELOG 커밋 없이 태그를 생성하지 않습니다.
 
 ## 판단이 애매할 때
 1. 먼저 변경 대상 패키지의 테스트 파일을 읽습니다.
