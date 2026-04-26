@@ -7,7 +7,7 @@
 ### Homebrew (공식)
 
 ```bash
-brew tap jiseop121/pbdash https://github.com/jiseop121/pbdash
+brew tap jiseop121/pbdash https://github.com/jiseop121/homebrew-pbdash
 brew install jiseop121/pbdash/pbdash
 ```
 
